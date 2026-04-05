@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5G NR conformance test</title>
+    <meta name="description" content="3GPP 38.101 Chapter 6 5G Tx Test Item Guide. Query supported Max Tx Power and Power Class for 5G bands (based on Table 6.2.1-1).">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    
+    <div class="app-layout">
+        <header class="top-header">
+            <h1>5G NR conformance test</h1>
+        </header>
+
+        <div class="main-body">
+            <aside class="sidebar glass-panel">
+                <nav class="nav-menu">
+                    <a href="#" class="nav-item active" data-target="mpt-power">6.2 Max Tx output Power</a>
+                    <a href="#" class="nav-item" data-target="power-ctrl">6.3.4 Power control</a>
+                    <a href="#" class="nav-item" data-target="evm">6.4.2 Error Vector Magnitude(EVM)</a>
+                    <a href="#" class="nav-item" data-target="inband">6.4.2.3 In-band Emission</a>
+                    <a href="#" class="nav-item" data-target="sem">6.5.2.2 Spectrum Emission Mask</a>
+                    <a href="#" class="nav-item" data-target="aclr">6.5.2.4 Adjacent Channel Leakage Ratio(ACLR)</a>
+                    <a href="#" class="nav-item" data-target="refsens">7.3 Reference Sensitivity</a>
+                    <a href="#" class="nav-item" data-target="max-input">7.4 Maximum Input Level</a>
+                </nav>
+                <div class="sidebar-footer">
+                    <div class="badge">3GPP TS 38.101</div>
+                </div>
+            </aside>
+
+            <main class="work-area">
+                <div id="mpt-power" class="tab-content active">
+                    <div class="workspace-container">
+                        <section class="search-card glass-panel" aria-labelledby="search-heading">
+                            <h2 id="search-heading">Band Search</h2>
+                            <p class="subtitle">Reference: <strong>Table 6.2.1-1: UE Power Class</strong></p>
+                            <div class="form-container">
+                                <div class="input-group">
+                                    <span class="prefix">Band</span>
+                                    <input type="text" id="band-input" placeholder="e.g., n1, 41, n78" autocomplete="off">
+                                </div>
+                                <button id="search-btn" class="glow-btn">
+                                    <span>Query Supported Power</span>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                </button>
+                            </div>
+                            <div id="error-msg" class="error-msg hidden">Band not found or undefined. Please try again.</div>
+                        </section>
+
+                        <section class="mpr-card glass-panel" aria-labelledby="mpr-heading">
+                            <h2 id="mpr-heading">MPR Parameters (Max Power Reduction)</h2>
+                            <p class="subtitle">Customize test conditions based on Table 6.2.2-1 &amp; 6.2.2-2 to observe MPR regulations.</p>
+                            <div class="mpr-form">
+                                <div class="select-group">
+                                    <label for="waveform-select">Waveform</label>
+                                    <select id="waveform-select" class="glass-select">
+                                        <option value="DFT-s-OFDM">DFT-s-OFDM</option>
+                                        <option value="CP-OFDM">CP-OFDM</option>
+                                    </select>
+                                </div>
+                                <div class="select-group">
+                                    <label for="mod-select">Modulation</label>
+                                    <select id="mod-select" class="glass-select">
+                                        <option value="Pi/2 BPSK">Pi/2 BPSK</option>
+                                        <option value="QPSK" selected>QPSK</option>
+                                        <option value="16 QAM">16 QAM</option>
+                                        <option value="64 QAM">64 QAM</option>
+                                        <option value="256 QAM">256 QAM</option>
+                                    </select>
+                                </div>
+                                <div class="select-group">
+                                    <label for="rb-select">RB Allocation</label>
+                                    <select id="rb-select" class="glass-select">
+                                        <option value="Inner">Inner</option>
+                                        <option value="Outer" selected>Outer</option>
+                                        <option value="Edge">Edge</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="result-container" class="result-card glass-panel hidden" aria-labelledby="result-band-name">
+                            <div class="result-header">
+                                <div class="result-title-group">
+                                    <span class="label">Query Result</span>
+                                    <h3 id="result-band-name">Band n1</h3>
+                                </div>
+                                <div class="pulse-indicator"></div>
+                            </div>
+                            <div class="result-body">
+                                <p class="result-intro">This band supports the following Power Classes in Table 6.2.1-1:</p>
+                                <div id="classes-container" class="classes-container">
+                                    <!-- Classes injected by JS -->
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <section class="info-card glass-panel" aria-labelledby="info-title">
+                            <h3 id="info-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                About Table 6.2.1-1
+                            </h3>
+                            <p>In the 5G NR (FR1) standard, UE Maximum Output Power is categorized into different Power Classes. Common classifications include:</p>
+                            <ul class="class-list">
+                                <li>
+                                    <div class="class-icon class-3">PC3</div>
+                                    <div class="class-desc">
+                                        <strong>Class 3 (24 dBm)</strong>
+                                        <span>Default standard power, supported by the vast majority of 5G bands.</span>
+                                    </div>
+                                </li>
+                                <li>
+                                    <div class="class-icon class-2">PC2</div>
+                                    <div class="class-desc">
+                                        <strong>Class 2 (26 dBm)</strong>
+                                        <span>High Power User Equipment (HPUE), often used for extended coverage (e.g., n41, n77).</span>
+                                    </div>
+                                </li>
+                                <li>
+                                    <div class="class-icon class-1">PC1</div>
+                                    <div class="class-desc">
+                                        <strong>Class 1 (31 dBm)</strong>
+                                        <span>Ultra-high power for special applications (e.g., FWA CPE).</span>
+                                    </div>
+                                </li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+                
+                <div id="evm" class="tab-content hidden">
+                    <div class="workspace-container evm-container">
+                        
+                        <section class="mpr-card glass-panel" aria-labelledby="evm-heading">
+                            <h2 id="evm-heading">EVM Test Parameters &amp; Channel Simulation</h2>
+                            <p class="subtitle">Select the Modulation and adjust the SNR slider based on Table 6.4.2.1-1 to observe the dynamic EVM constellation changes.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="evm-mod-select">Modulation</label>
+                                    <select id="evm-mod-select" class="glass-select">
+                                        <option value="Pi/2-BPSK">Pi/2-BPSK</option>
+                                        <option value="QPSK" selected>QPSK</option>
+                                        <option value="16 QAM">16 QAM</option>
+                                        <option value="64 QAM">64 QAM</option>
+                                        <option value="256 QAM">256 QAM</option>
+                                    </select>
+                                </div>
+                                <div class="select-group" style="min-width: 250px; flex-grow: 1; max-width: 400px;">
+                                    <label for="snr-slider" style="display: flex; justify-content: space-between; align-items: baseline;">
+                                        <span>Channel SNR</span>
+                                        <span id="snr-display-val" style="color: #60a5fa; font-size: 1.25rem; font-weight: 700;">20.0 dB</span>
+                                    </label>
+                                    <input type="range" id="snr-slider" min="0" max="30" step="0.5" value="20" class="glass-slider">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        <span>0 dB (Poor)</span>
+                                        <span>30 dB (Excellent)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 320px;">
+                                    <h3>Measurement &amp; Limits</h3>
+                                    
+                                    <div class="evm-comparison-box">
+                                        <div class="evm-stat-box">
+                                            <div class="evm-stat-label">Regulatory Limit</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="evm-limit-value" style="font-size: 2.2rem; font-weight: 700; color: var(--text-secondary);">17.5</div>
+                                                <div style="font-size: 1.2rem; font-weight: 600; color: var(--text-secondary);">%</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="evm-stat-divider">|</div>
+                                        
+                                        <div class="evm-stat-box">
+                                            <div class="evm-stat-label">Simulated EVM</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="evm-sim-value" style="font-size: 3rem; font-weight: 700;">10.0</div>
+                                                <div class="evm-unit">%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="evm-pass-fail" class="evm-status-banner">
+                                        PASS
+                                    </div>
+                                    
+                                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>SNR (Signal-to-Noise Ratio)</strong>: Higher values indicate less noise and interference, leading to tighter constellation clusters.<br>
+                                            * <strong>EVM (Error Vector Magnitude)</strong>: The regulatory limit is the maximum allowable error margin for the corresponding modulation.
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="evm-constellation">
+                                    <h3>Dynamic Constellation Diagram</h3>
+                                    <div class="canvas-wrapper">
+                                        <canvas id="constellation-canvas" width="300" height="300"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+
+                <!-- 6.3.4 Power Control Tab Content -->
+                <div id="power-ctrl" class="tab-content hidden">
+                    <div class="workspace-container pwrctrl-container">
+                        <section class="mpr-card glass-panel" aria-labelledby="pwrctrl-heading">
+                            <h2 id="pwrctrl-heading">Power Control Test Parameters</h2>
+                            <p class="subtitle">Simulate TPC command power steps and observe the UE transient response in the time domain.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="pwrctrl-duplex">Duplex Mode</label>
+                                    <select id="pwrctrl-duplex" class="glass-select">
+                                        <option value="FDD" selected>FDD (Continuous Tx)</option>
+                                        <option value="TDD">TDD (Tx/Rx Switching)</option>
+                                    </select>
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="pwrctrl-dir">TPC Direction</label>
+                                    <select id="pwrctrl-dir" class="glass-select">
+                                        <option value="up" selected>Power Up (Continuous)</option>
+                                        <option value="down">Power Down (Continuous)</option>
+                                        <option value="alt">Alternating (Up/Down)</option>
+                                    </select>
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="pwrctrl-pattern">TPC Pattern</label>
+                                    <select id="pwrctrl-pattern" class="glass-select">
+                                        <option value="A" selected>Power pattern A</option>
+                                        <option value="B">Power pattern B</option>
+                                        <option value="C">Power pattern C</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 300px; flex: 1;">
+                                    <h3>Power Control Characteristics</h3>
+                                    
+                                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>FDD vs TDD</strong>:<br>
+                                            - <strong>FDD</strong>: Continuous transmission, showing uniform power steps in every slot.<br>
+                                            - <strong>TDD</strong>: Tx is pulsed per Uplink/Downlink config. Exhibits 'OFF Power' breaks; TPC steps manifest across alternating U-slot bursts.<br><br>
+                                            * <strong>TPC Pattern</strong>: Simulates relative tolerance step increments, including sudden Resource Block (RB) size changes spanning across Sub-frames.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="evm-constellation" style="flex: 2; min-width: 450px;">
+                                    <h3>Time Domain Tx Power</h3>
+                                    <div class="canvas-wrapper" style="border-radius: 16px; width: 100%; padding: 1rem; background: rgba(15, 23, 42, 0.8);">
+                                        <canvas id="pwrctrl-canvas" width="600" height="300" style="width: 100%; max-width: 600px; height: auto; border-radius: 8px;"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- 6.4.2.3 In-band Emission Tab Content -->
+                <div id="inband" class="tab-content hidden">
+                    <div class="workspace-container inband-container">
+                        
+                        <section class="mpr-card glass-panel" aria-labelledby="inband-heading">
+                            <h2 id="inband-heading">In-band Emission Parameters</h2>
+                            <p class="subtitle">Observe LO Leakage and IQ Image bounds according to Table 6.4.2.3-1 configuration.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="inband-pout">Output Power (dBm)</label>
+                                    <input type="number" id="inband-pout" class="glass-select" value="20" step="1" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="inband-rb-pos">RB Allocation Position</label>
+                                    <select id="inband-rb-pos" class="glass-select">
+                                        <option value="left" selected>Left Edge (Lower)</option>
+                                        <option value="right">Right Edge (Upper)</option>
+                                        <option value="center">Center</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 300px; flex: 1;">
+                                    <h3>Dynamic Regulatory Limits</h3>
+                                    
+                                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                        <div class="evm-stat-box" style="flex: 1; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                                            <div class="evm-stat-label">Carrier Leakage Limit</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="inband-carrier-limit" style="font-size: 2.5rem; font-weight: 700; color: #f43f5e; text-shadow: 0 0 10px rgba(244, 63, 94, 0.4);">-28</div>
+                                                <div style="font-size: 1rem; font-weight: 600; color: #f43f5e;">dBc</div>
+                                            </div>
+                                        </div>
+                                        <div class="evm-stat-box" style="flex: 1; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                                            <div class="evm-stat-label">IQ Image Limit</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="inband-image-limit" style="font-size: 2.5rem; font-weight: 700; color: #eab308; text-shadow: 0 0 10px rgba(234, 179, 8, 0.4);">-28</div>
+                                                <div style="font-size: 1rem; font-weight: 600; color: #eab308;">dB</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>Carrier Leakage (LO)</strong>: Located at center frequency offset (0 Hz). Regulatory limits vary depending on absolute output power.<br><br>
+                                            * <strong>IQ Image</strong>: When RB allocation is off-centered and unfilled, IQ mixer imbalances cause a mirror reflection on the opposite band edge.
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="evm-constellation" style="flex: 2; min-width: 450px;">
+                                    <h3>Dynamic In-band Emission Spectrum</h3>
+                                    <div class="canvas-wrapper" style="border-radius: 16px; width: 100%; padding: 1rem; background: rgba(15, 23, 42, 0.8);">
+                                        <canvas id="inband-canvas" width="600" height="300" style="width: 100%; max-width: 600px; height: auto; border-radius: 8px;"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+                <!-- 6.5.2.2 SEM Tab Content -->
+                <div id="sem" class="tab-content hidden">
+                    <div class="workspace-container sem-container">
+                        
+                        <section class="mpr-card glass-panel" aria-labelledby="sem-heading">
+                            <h2 id="sem-heading">SEM Test Parameters</h2>
+                            <p class="subtitle">Select the channel bandwidth to construct corresponding Spectrum Emission Mask elements per Table 6.5.2.2-1.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="select-group" style="width: 250px;">
+                                    <label for="sem-bw-select">Channel Bandwidth</label>
+                                    <select id="sem-bw-select" class="glass-select">
+                                        <option value="3">3 MHz</option>
+                                        <option value="5">5 MHz</option>
+                                        <option value="10">10 MHz</option>
+                                        <option value="15">15 MHz</option>
+                                        <option value="20" selected>20 MHz</option>
+                                        <option value="25">25 MHz</option>
+                                        <option value="30">30 MHz</option>
+                                        <option value="40">40 MHz</option>
+                                        <option value="50">50 MHz</option>
+                                        <option value="60">60 MHz</option>
+                                        <option value="80">80 MHz</option>
+                                        <option value="100">100 MHz</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 300px; flex: 1;">
+                                    <h3>Regulatory Mask Limits</h3>
+                                    
+                                    <div class="table-container" style="margin-top: 1rem; overflow-x: auto; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+                                        <table style="width: 100%; border-collapse: collapse; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1);">
+                                                    <th style="padding: 0.5rem;">Δf_OOB (MHz)</th>
+                                                    <th style="padding: 0.5rem; color: #f43f5e;">Limit (dBm)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="sem-table-body">
+                                                <!-- Dynamic Content -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>SEM (Spectrum Emission Mask)</strong>: Defines the maximum allowed absolute emission boundary (in dBm) outside the primary channel. The red staircase boundary indicates the regulatory compliance limit.
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="evm-constellation" style="flex: 2; min-width: 450px;">
+                                    <h3>Spectrum Envelope Simulation</h3>
+                                    <div class="canvas-wrapper" style="border-radius: 16px; width: 100%; padding: 1rem; background: rgba(15, 23, 42, 0.8);">
+                                        <canvas id="sem-canvas" width="600" height="300" style="width: 100%; max-width: 600px; height: auto; border-radius: 8px;"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+                
+                <!-- 6.5.2.4 ACLR Tab Content -->
+                <div id="aclr" class="tab-content hidden">
+                    <div class="workspace-container aclr-container">
+                        
+                        <section class="mpr-card glass-panel" aria-labelledby="aclr-heading">
+                            <h2 id="aclr-heading">ACLR Test Parameters</h2>
+                            <p class="subtitle">Reference Table 6.5.2.4.1 to configure bandwidth and Power Class. Observe ACLR spectrum dynamically.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="aclr-bw-select">Channel Bandwidth</label>
+                                    <select id="aclr-bw-select" class="glass-select">
+                                        <option value="5">5 MHz</option>
+                                        <option value="10">10 MHz</option>
+                                        <option value="15">15 MHz</option>
+                                        <option value="20" selected>20 MHz</option>
+                                        <option value="25">25 MHz</option>
+                                        <option value="30">30 MHz</option>
+                                        <option value="40">40 MHz</option>
+                                        <option value="50">50 MHz</option>
+                                        <option value="60">60 MHz</option>
+                                        <option value="80">80 MHz</option>
+                                        <option value="100">100 MHz</option>
+                                    </select>
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="aclr-pc-select">Power Class</label>
+                                    <select id="aclr-pc-select" class="glass-select">
+                                        <option value="1">Class 1</option>
+                                        <option value="1.5">Class 1.5</option>
+                                        <option value="2">Class 2</option>
+                                        <option value="3" selected>Class 3</option>
+                                    </select>
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="aclr-pa-out">PA Output Power (dBm)</label>
+                                    <input type="number" id="aclr-pa-out" class="glass-select" value="24" step="0.1" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="aclr-pa-p1db">PA P1dB (dBm)</label>
+                                    <input type="number" id="aclr-pa-p1db" class="glass-select" value="26" step="0.1" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 250px;">
+                                    <h3>Regulatory Bounds</h3>
+                                    
+                                    <div class="evm-stat-box" style="margin-top: 1rem; background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <div class="evm-stat-label">NR ACLR Limit</div>
+                                        <div class="evm-value-container" style="justify-content: center;">
+                                            <div id="aclr-limit-value" style="font-size: 4rem; font-weight: 700; color: #f43f5e; text-shadow: 0 0 15px rgba(244, 63, 94, 0.4);">30</div>
+                                            <div style="font-size: 1.5rem; font-weight: 600; color: #f43f5e;">dB</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="aclr-status-banner" style="margin-top: 1rem; text-align: center; padding: 0.75rem; border-radius: 8px; font-weight: bold; font-size: 1rem; transition: all 0.3s; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981;">
+                                        ✅ ACLR Pass
+                                    </div>
+                                    
+                                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>ACLR</strong> (Adjacent Channel Leakage Ratio): The ratio of the filtered mean power centered on the assigned channel frequency to the filtered mean power centered on an adjacent channel frequency. Measured in dB.
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="evm-constellation" style="flex: 2; min-width: 400px;">
+                                    <h3>Spectral Regrowth Plot</h3>
+                                    <div class="canvas-wrapper" style="border-radius: 16px; width: 100%; padding: 1rem; background: rgba(15, 23, 42, 0.8);">
+                                        <canvas id="aclr-canvas" width="600" height="300" style="width: 100%; max-width: 600px; height: auto; border-radius: 8px;"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+                
+                <!-- 7.3 Reference Sensitivity Tab Content -->
+                <div id="refsens" class="tab-content hidden">
+                    <div class="workspace-container refsens-container">
+                        
+                        <section class="mpr-card glass-panel" aria-labelledby="refsens-heading">
+                            <h2 id="refsens-heading">Reference Sensitivity Parameters</h2>
+                            <p class="subtitle">Enter the Operating Band, SCS, and Bandwidth to estimate the 2 MIMO and 4 MIMO Sensitivity per Table 7.3.2.3-1a/b.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="input-group" style="width: 200px;">
+                                    <span class="prefix">Band</span>
+                                    <input type="text" id="refsens-band" class="glass-select" placeholder="e.g. n1, n41, n77" value="n1" autocomplete="off" style="width: 100%; box-sizing: border-box; text-transform: lowercase;">
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="refsens-scs">SCS (kHz)</label>
+                                    <select id="refsens-scs" class="glass-select">
+                                        <option value="15" selected>15 kHz</option>
+                                        <option value="30">30 kHz</option>
+                                        <option value="60">60 kHz</option>
+                                    </select>
+                                </div>
+                                <div class="select-group" style="width: 200px;">
+                                    <label for="refsens-bw">Bandwidth (MHz)</label>
+                                    <select id="refsens-bw" class="glass-select">
+                                        <!-- Dynamically populated based on SCS -->
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 300px; flex: 1;">
+                                    <h3>Calculated Values (Table 7.3.2.3-1)</h3>
+                                    
+                                    <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+                                        <div class="evm-stat-box" style="background: rgba(16, 185, 129, 0.1); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                            <div class="evm-stat-label">2 MIMO Sensitivity</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="refsens-2mimo" style="font-size: 3.5rem; font-weight: 700; color: #10b981; text-shadow: 0 0 15px rgba(16, 185, 129, 0.4);">-96.8</div>
+                                                <div style="font-size: 1.2rem; font-weight: 600; color: #10b981; margin-left: 8px;">dBm</div>
+                                            </div>
+                                        </div>
+                                        <div class="evm-stat-box" style="background: rgba(59, 130, 246, 0.1); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.3);">
+                                            <div class="evm-stat-label">Estimated 4 MIMO Sensitivity</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="refsens-4mimo" style="font-size: 3.5rem; font-weight: 700; color: #3b82f6; text-shadow: 0 0 15px rgba(59, 130, 246, 0.4);">-99.8</div>
+                                                <div style="font-size: 1.2rem; font-weight: 600; color: #3b82f6; margin-left: 8px;">dBm</div>
+                                            </div>
+                                        </div>
+                                        <div class="evm-stat-box" style="background: rgba(245, 158, 11, 0.1); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.3);">
+                                            <div class="evm-stat-label">Estimated Single Antenna Sensitivity</div>
+                                            <div class="evm-value-container" style="justify-content: center;">
+                                                <div id="refsens-1mimo" style="font-size: 3.5rem; font-weight: 700; color: #f59e0b; text-shadow: 0 0 15px rgba(245, 158, 11, 0.4);">-93.8</div>
+                                                <div style="font-size: 1.2rem; font-weight: 600; color: #f59e0b; margin-left: 8px;">dBm</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>Single Antenna Sensitivity</strong>: An estimated 3 dB reduction in margin compared to 2 MIMO, representing the loss of Rx spacing gain.<br><br>
+                                            * <strong>2 MIMO Sensitivity</strong>: Based on Base Reference Sensitivity + 10 * log10(N_RB / Ref_N_RB). Represents the minimal Rx power required to meet the throughput requirement.<br><br>
+                                            * <strong>4 MIMO Sensitivity</strong>: An estimated 3 dB improvement over 2 MIMO, representing the array gain from doubling the receiver antennas.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+
+                <!-- 7.4 Maximum Input Level Tab Content -->
+                <div id="max-input" class="tab-content hidden">
+                    <div class="workspace-container max-input-container">
+                        
+                        <section class="mpr-card glass-panel" aria-labelledby="max-input-heading">
+                            <h2 id="max-input-heading">Maximum Input Level Parameters</h2>
+                            <p class="subtitle">Adjust the Received Signal Strength Indicator (RSSI) to observe ADC or LNA saturation effects on throughput.</p>
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: center;">
+                                <div class="select-group" style="width: 140px;">
+                                    <label>Modulation</label>
+                                    <div class="glass-select disabled-looking" style="text-align: center; font-size: 0.85rem;">64-QAM</div>
+                                </div>
+                                <div class="select-group" style="width: 140px;">
+                                    <label for="max-input-lna-gain">LNA Gain (dB)</label>
+                                    <input type="number" id="max-input-lna-gain" class="glass-select" value="20" step="1" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                                <div class="select-group" style="width: 140px;">
+                                    <label for="max-input-p1db">LNA P1dB (dBm)</label>
+                                    <input type="number" id="max-input-p1db" class="glass-select" value="5" step="1" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                                <div class="select-group" style="min-width: 300px; flex-grow: 1; max-width: 400px;">
+                                    <label for="max-input-slider" style="display: flex; justify-content: space-between; align-items: baseline;">
+                                        <span>Receiver Input Power (RSSI)</span>
+                                        <span id="max-input-val-display" style="color: #60a5fa; font-size: 1.25rem; font-weight: 700;">-40 dBm</span>
+                                    </label>
+                                    <input type="range" id="max-input-slider" min="-70" max="0" step="1" value="-40" class="glass-slider">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        <span>-70 dBm</span>
+                                        <span>0 dBm</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 320px; flex: 1;">
+                                    <h3>Performance &amp; Throughput</h3>
+                                    
+                                    <div class="evm-stat-box" style="margin-top: 1rem; background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <div class="evm-stat-label">Data Throughput</div>
+                                        <div class="evm-value-container" style="justify-content: center;">
+                                            <div id="max-input-tput" style="font-size: 4rem; font-weight: 700; color: #10b981; text-shadow: 0 0 15px rgba(16, 185, 129, 0.4);">99.8</div>
+                                            <div style="font-size: 1.5rem; font-weight: 600; color: #10b981; margin-left: 8px;">%</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="max-input-status" class="evm-status-banner" style="margin-top: 1rem; text-align: center; padding: 0.75rem; border-radius: 8px; font-weight: bold; font-size: 1rem; transition: all 0.3s; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981;">
+                                        ✅ Rx Operating Linearly
+                                    </div>
+                                    
+                                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
+                                            * <strong>Maximum Input Level</strong>: When the Input Signal Strength (RSSI) combined with the LNA Gain exceeds the LNA P1dB compression point, the constellation exhibits AM-AM distortion. As the constellation compresses, Data Throughput deteriorates concurrently down to 0%.
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="evm-constellation" style="flex: 2; min-width: 400px; display: flex; flex-direction: column; align-items: center;">
+                                    <h3 style="align-self: flex-start;">64-QAM Constellation</h3>
+                                    <div class="canvas-wrapper" style="border-radius: 16px; padding: 1rem; background: rgba(15, 23, 42, 0.8); display: inline-block;">
+                                        <canvas id="max-input-canvas" width="300" height="300" style="border-radius: 8px;"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+                
+                <footer>
+                    <p>Designed for RF &amp; Hardware Engineers. Built with stunning glassmorphism.</p>
+                </footer>
+            </main>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
