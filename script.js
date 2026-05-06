@@ -1083,242 +1083,434 @@ if (inbandPoutInput) {
 // Power Control Module (6.3.4)
 // ============================================
 
-const pwrCtrlDuplex = document.getElementById('pwrctrl-duplex');
-const pwrCtrlDir = document.getElementById('pwrctrl-dir');
-const pwrCtrlPattern = document.getElementById('pwrctrl-pattern');
-const pwrCtrlCanvas = document.getElementById('pwrctrl-canvas');
+const tpcPatternType = document.getElementById('tpc-pattern-type');
+const paSwitchSlider = document.getElementById('pa-switch-slider');
+const paSwitchVal = document.getElementById('pa-switch-val');
+const gainErrorSlider = document.getElementById('gain-error-slider');
+const gainErrorVal = document.getElementById('gain-error-val');
+const timingSkewSlider = document.getElementById('timing-skew-slider');
+const timingSkewVal = document.getElementById('timing-skew-val');
+const tpcTransType = document.getElementById('tpc-trans-type');
 
-let pwrCtrlCtx = null;
-if (pwrCtrlCanvas) {
-    pwrCtrlCtx = pwrCtrlCanvas.getContext('2d');
+const tpcLog = document.getElementById('tpc-log');
+const tpcPwrCanvas = document.getElementById('tpc-pwr-canvas');
+const tpcStartBtn = document.getElementById('tpc-start-btn');
+const tpcResetBtn = document.getElementById('tpc-reset-btn');
+
+let tpcCtx = null;
+if (tpcPwrCanvas) {
+    tpcCtx = tpcPwrCanvas.getContext('2d');
 }
 
-let pwrCtrlAnimationId = null;
-let pwrCtrlTimeOffset = 0;
+let tpcAnimationId = null;
+let tpcCurrentStep = 0;
+let tpcChartData = [];
+let tpcIsAnimating = false;
 
-function drawPowerControl(duplex, dir, pattern) {
-    if (!pwrCtrlCtx) return;
-    
-    const cw = pwrCtrlCanvas.width;
-    const ch = pwrCtrlCanvas.height;
-    
-    // Clear
-    pwrCtrlCtx.fillStyle = "rgba(15, 23, 42, 1)";
-    pwrCtrlCtx.fillRect(0, 0, cw, ch);
-    
-    // Grid & Axis
-    pwrCtrlCtx.strokeStyle = "rgba(148, 163, 184, 0.1)";
-    pwrCtrlCtx.lineWidth = 1;
-    pwrCtrlCtx.beginPath();
-    for(let y=40; y<ch-40; y+=30) { pwrCtrlCtx.moveTo(40, y); pwrCtrlCtx.lineTo(cw, y); }
-    // Draw Radio Frame markers (every 10 subframes)
-    let sfWidth = (cw - 60) / 50;
-    for(let i=0; i<=5; i++) {
-        let x = 40 + i * 10 * sfWidth;
-        pwrCtrlCtx.moveTo(x, 20); pwrCtrlCtx.lineTo(x, ch-20);
+function getTpcTolerance(stepDeltaP, transType) {
+    let absDp = Math.abs(stepDeltaP);
+    if (absDp < 2) {
+        if (transType === 'pusch') return 2.0;
+        if (transType === 'srs') return 2.5;
+        if (transType === 'prach') return 2.0;
+    } else if (absDp >= 2 && absDp < 3) {
+        if (transType === 'pusch') return 2.5;
+        if (transType === 'srs') return 3.5;
+        if (transType === 'prach') return 2.5;
+    } else if (absDp >= 3 && absDp < 4) {
+        if (transType === 'pusch') return 3.0;
+        if (transType === 'srs') return 4.5;
+        if (transType === 'prach') return 3.0;
+    } else if (absDp >= 4 && absDp <= 10) {
+        if (transType === 'pusch') return 3.5;
+        if (transType === 'srs') return 5.5;
+        if (transType === 'prach') return 3.5;
+    } else if (absDp > 10 && absDp < 15) {
+        if (transType === 'pusch') return 4.0;
+        if (transType === 'srs') return 7.0;
+        if (transType === 'prach') return 4.0;
+    } else { // >= 15
+        if (transType === 'pusch') return 5.0;
+        if (transType === 'srs') return 8.0;
+        if (transType === 'prach') return 5.0;
     }
-    pwrCtrlCtx.stroke();
+    return 2.0;
+}
+
+function generateTpcSequence() {
+    const pattern = tpcPatternType.value;
+    const paSwitchPoint = parseFloat(paSwitchSlider.value);
+    const gainError = parseFloat(gainErrorSlider.value);
+    const transType = tpcTransType.value;
     
-    // Main Axes lines
-    pwrCtrlCtx.strokeStyle = "#fff";
-    pwrCtrlCtx.lineWidth = 2;
-    pwrCtrlCtx.beginPath();
-    pwrCtrlCtx.moveTo(40, 20); pwrCtrlCtx.lineTo(40, ch-40); // Y
-    pwrCtrlCtx.moveTo(20, ch-40); pwrCtrlCtx.lineTo(cw-20, ch-40); // X
+    let isDown = pattern.startsWith('down_');
+    let isAlt = pattern === 'alternating';
     
-    // Arrow heads
-    pwrCtrlCtx.moveTo(35, 25); pwrCtrlCtx.lineTo(40, 15); pwrCtrlCtx.lineTo(45, 25);
-    pwrCtrlCtx.moveTo(cw-25, ch-45); pwrCtrlCtx.lineTo(cw-15, ch-40); pwrCtrlCtx.lineTo(cw-25, ch-35);
-    pwrCtrlCtx.stroke();
+    // According to 3GPP, start at exactly Pmax (26) for Down, and Pmin (-40) for Up
+    let startPower = isDown ? 26 : -40;
+    if (isAlt) startPower = 20; // Alternating high
     
-    pwrCtrlCtx.fillStyle = "#fff";
-    pwrCtrlCtx.font = "bold 13px sans-serif";
-    pwrCtrlCtx.fillText(`Power pattern ${pattern}`, 60, 30);
+    // Pattern A & Continuous use 2dB steps, Pattern B & C use 1dB steps
+    let baseStep = isDown ? -2 : 2;
+    if (pattern.includes('pattern_b') || pattern.includes('pattern_c')) {
+        baseStep = isDown ? -1 : 1;
+    }
     
-    // Labels for X-axis
-    pwrCtrlCtx.font = "11px sans-serif";
-    pwrCtrlCtx.textAlign = "center";
-    for(let i=0; i<5; i++) {
-        let lx = 40 + (i*10 + 5) * sfWidth;
-        if (i === 0) {
-            pwrCtrlCtx.fillText("0 .. 9", lx, ch - 25);
-            pwrCtrlCtx.fillText("1", lx, ch - 10);
-        } else if (i === 1) {
-            pwrCtrlCtx.fillText(`sub-frame#`, lx, ch - 25);
-            pwrCtrlCtx.fillText(`${i+1}`, lx, ch - 10);
-        } else {
-            pwrCtrlCtx.fillText(`${i+1}`, lx, ch - 10);
+    let rbJump = isDown ? -10 : 10;
+    
+    let rbChangeSf = -1;
+    if (pattern.includes('pattern_a')) rbChangeSf = 15;
+    if (pattern.includes('pattern_b')) rbChangeSf = 25;
+    if (pattern.includes('pattern_c')) rbChangeSf = 35;
+    
+    let totalSteps = isAlt ? 10 : 50;
+    let altStep = -15; // 20 -> 5 -> 20 -> 5
+    
+    let p_actual = [startPower]; 
+    let p_ideal = [startPower];
+    let data = [];
+    
+    data.push({
+        sf: 0, 
+        ideal: startPower, 
+        actual: startPower, 
+        idealDelta: 0,
+        tol: 0, 
+        isSwitch: false, 
+        fail: false,
+        msg: `[Init] Sub-frame 0: Starting Power = ${startPower} dBm`
+    });
+    
+    for (let i = 1; i < totalSteps; i++) {
+        let idealStep = baseStep;
+        if (isAlt) {
+            idealStep = altStep;
+            altStep = -altStep; // Flip direction
+        } else if (i === rbChangeSf) {
+            idealStep = rbJump;
         }
-    }
-    pwrCtrlCtx.textAlign = "left";
-    pwrCtrlCtx.fillText("radio frame", cw - 80, ch - 10);
-    
-    // Generate Trace Data
-    let traceData = [];
-    let pOut = dir === 'up' ? -20 : (dir === 'down' ? 20 : 0);
-    let step = (dir === 'down') ? -1 : 1;
-    let rbJump = (dir === 'down') ? -8 : 8;
-    if (dir === 'alt') { step = 3; rbJump = 8; }
-    
-    let rbChangeIdx = 15; // default pattern A
-    if (pattern === 'B') rbChangeIdx = 25;
-    if (pattern === 'C') rbChangeIdx = 35;
-    
-    for (let s = 0; s < 50; s++) {
-        let isTxOn = true;
-        let applyTpc = false;
         
-        if (duplex === 'FDD') {
-            applyTpc = true;
+        let ideal = p_actual[i-1] + idealStep;
+        
+        // Apply 3GPP limits to ideal power
+        if (ideal > 26) ideal = 26;
+        if (ideal < -40) ideal = -40;
+        
+        p_ideal.push(ideal);
+        
+        let actual = ideal;
+        let isSwitch = false;
+        
+        let crossedThreshold = false;
+        if (isAlt) {
+            if (p_actual[i-1] < paSwitchPoint && ideal >= paSwitchPoint) crossedThreshold = true;
+            if (p_actual[i-1] > paSwitchPoint && ideal <= paSwitchPoint) crossedThreshold = true;
         } else {
-            // TDD (Uplink bursts in middle of radio frame)
-            let sf = s % 10;
-            if (sf >= 4 && sf <= 7) {
-                isTxOn = true;
-                applyTpc = true;
-            } else {
-                isTxOn = false;
+            if (!isDown && p_actual[i-1] < paSwitchPoint && ideal >= paSwitchPoint) crossedThreshold = true;
+            if (isDown && p_actual[i-1] > paSwitchPoint && ideal <= paSwitchPoint) crossedThreshold = true;
+        }
+        
+        if (crossedThreshold) {
+            actual = ideal + gainError;
+            isSwitch = true;
+        }
+        
+        // Apply 3GPP limits to actual power
+        if (actual > 26) actual = 26;
+        if (actual < -40) actual = -40;
+        
+        p_actual.push(actual);
+        
+        let tol = getTpcTolerance(idealStep, transType);
+        
+        let actualStep = actual - p_actual[i-1];
+        let clampedIdealStep = ideal - p_actual[i-1];
+        let diff = Math.abs(actual - ideal); 
+        let isFail = diff > tol;
+        
+        let passStr = isFail ? '<span style="color:#ef4444;font-weight:bold;">[FAIL]</span>' : '<span style="color:#10b981;font-weight:bold;">[PASS]</span>';
+        let msg = `${passStr} Sub-frame ${i}: Measured ΔP = ${actualStep.toFixed(1)} dB, Allowed = ±${tol.toFixed(1)} dB`;
+        if (isSwitch) {
+            msg += `<br>&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:#f59e0b;">Violation @ PA Switch Point (Threshold ${paSwitchPoint} dBm crossed)</span>`;
+            if (isFail) {
+                 msg += `<br>&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:#ef4444;">Gain Error ${gainError} dB exceeds tolerance.</span>`;
             }
         }
         
-        if (applyTpc) {
-            let currentStep = step;
-            if (dir === 'alt') currentStep = (s % 2 === 0) ? step : -step;
-            pOut += currentStep;
-            
-            // Special RB Change jump on exact sub-frame
-            if (s === rbChangeIdx) pOut += rbJump;
-            
-            // Cap to avoid drawing off-screen
-            if (pOut > 30) pOut = 30;
-            if (pOut < -30) pOut = -30;
-        }
-        
-        traceData.push({
-            slot: s,
-            power: pOut,
-            txOn: isTxOn,
-            isRbChange: (s === rbChangeIdx || (duplex ==='TDD' && s > rbChangeIdx && traceData[s-1] && !traceData[s-1].txOn && isTxOn && s <= rbChangeIdx+6))
-            // The TDD logic above just highlights the first burst after rbchange
+        data.push({
+            sf: i,
+            ideal: ideal,
+            actual: actual,
+            idealDelta: idealStep,
+            tol: tol,
+            isSwitch: isSwitch,
+            fail: isFail,
+            msg: msg
         });
     }
-    
-    function mapY(p) {
-        return (ch - 40) - ((p + 30) / 60) * (ch - 80);
-    }
-    
-    // Sweep Animation
-    let drawUpTo = Math.min(50, Math.floor(pwrCtrlTimeOffset));
-    
-    // Draw Data
-    pwrCtrlCtx.beginPath();
-    pwrCtrlCtx.strokeStyle = "rgba(52, 211, 153, 0.9)";
-    pwrCtrlCtx.fillStyle = "rgba(52, 211, 153, 0.9)";
-    pwrCtrlCtx.lineWidth = 1.5;
-    
-    let rbChangeLabelDrawn = false;
-    
-    if (duplex === 'FDD') {
-        let isDrawing = false;
-        for (let i = 0; i < drawUpTo; i++) {
-            let d = traceData[i];
-            let xStart = 40 + i * sfWidth;
-            let xEnd = xStart + sfWidth;
-            let y = mapY(d.power);
-            
-            if (!isDrawing) {
-                pwrCtrlCtx.moveTo(xStart, y);
-                isDrawing = true;
-            } else {
-                pwrCtrlCtx.lineTo(xStart, y); // Vertical jump
-            }
-            pwrCtrlCtx.lineTo(xEnd, y);       // Horizontal slot duration
-            
-            // Draw RB Change text
-            if (i === rbChangeIdx && !rbChangeLabelDrawn) {
-                pwrCtrlCtx.save();
-                pwrCtrlCtx.fillStyle = "#fff";
-                pwrCtrlCtx.font = "bold 13px sans-serif";
-                pwrCtrlCtx.fillText("RB change", xEnd + 5, y + (dir==='up'?20:-20));
-                
-                // Dotted vertical line
-                pwrCtrlCtx.beginPath();
-                pwrCtrlCtx.setLineDash([3,3]);
-                pwrCtrlCtx.strokeStyle = "rgba(255,255,255,0.4)";
-                pwrCtrlCtx.moveTo(xEnd, y);
-                pwrCtrlCtx.lineTo(xEnd, ch-40);
-                pwrCtrlCtx.stroke();
-                pwrCtrlCtx.restore();
-                rbChangeLabelDrawn = true;
-            }
-        }
-        pwrCtrlCtx.stroke();
-        
+    return data;
+}
+
+function updateSliders() {
+    if (paSwitchVal) paSwitchVal.textContent = `${paSwitchSlider.value} dBm`;
+    if (gainErrorVal) gainErrorVal.textContent = `${gainErrorSlider.value} dB`;
+    if (timingSkewVal) timingSkewVal.textContent = `${timingSkewSlider.value} us`;
+}
+
+function getTpcYScale() {
+    let minP = 100, maxP = -100;
+    if (tpcChartData && tpcChartData.length > 0) {
+        tpcChartData.forEach(d => {
+            if (d.ideal < minP) minP = d.ideal;
+            if (d.actual < minP) minP = d.actual;
+            if (d.ideal > maxP) maxP = d.ideal;
+            if (d.actual > maxP) maxP = d.actual;
+        });
     } else {
-        // TDD Drawing (Vertical Bars exactly like the attached figure)
-        for (let i = 0; i < drawUpTo; i++) {
-            let d = traceData[i];
-            if (d.txOn) {
-                let xCenter = 40 + i * sfWidth + sfWidth/2;
-                let y = mapY(d.power);
-                let barW = sfWidth * 0.6;
-                // Draw standing bar
-                pwrCtrlCtx.strokeRect(xCenter - barW/2, y, barW, (ch-40) - y);
-                
-                if (d.slot >= rbChangeIdx && !rbChangeLabelDrawn) {
-                    pwrCtrlCtx.fillStyle = "#fff";
-                    pwrCtrlCtx.font = "bold 13px sans-serif";
-                    pwrCtrlCtx.fillText("RB change", xCenter + 10, y + (dir==='up'?20:-20));
-                    rbChangeLabelDrawn = true;
-                }
+        minP = -5; maxP = 35;
+    }
+    let range = maxP - minP;
+    if (range < 10) range = 10;
+    // ensure PA Switch Point is visible
+    let threshold = parseFloat(paSwitchSlider.value);
+    if (threshold < minP) minP = threshold;
+    if (threshold > maxP) maxP = threshold;
+    range = maxP - minP;
+    
+    return { minP: minP - range * 0.1, maxP: maxP + range * 0.2 };
+}
+
+function drawTpcBackground(cw, ch) {
+    tpcCtx.fillStyle = "rgba(15, 23, 42, 1)";
+    tpcCtx.fillRect(0, 0, cw, ch);
+    
+    let {minP, maxP} = getTpcYScale();
+    
+    function mapY(val) { return ch - 40 - ((val - minP) / (maxP - minP)) * (ch - 80); }
+    let totalSteps = tpcChartData && tpcChartData.length > 0 ? tpcChartData.length : 50;
+    function mapX(sf) { return 40 + (sf / totalSteps) * (cw - 60); }
+    
+    // Grid & Axes
+    tpcCtx.strokeStyle = "rgba(148, 163, 184, 0.15)";
+    tpcCtx.lineWidth = 1;
+    tpcCtx.beginPath();
+    
+    // Draw radio frames
+    let numRF = Math.ceil(totalSteps / 10);
+    for(let rf=0; rf<=numRF; rf++) {
+        let x = mapX(rf * 10);
+        tpcCtx.moveTo(x, 20); tpcCtx.lineTo(x, ch-40);
+        if (rf < numRF) {
+            tpcCtx.fillStyle = "rgba(148, 163, 184, 0.8)";
+            tpcCtx.font = "11px sans-serif";
+            tpcCtx.textAlign = "center";
+            if (totalSteps === 10) {
+                tpcCtx.fillText(`SF 0..9`, x + (mapX(10)-mapX(0))/2, ch - 20);
             } else {
-                // optional: draw ... dots where it's off to match figure
-                if (i % 10 === 1) { // just draw one '...' per frame OFF period
-                    let xCenter = 40 + i * sfWidth;
-                    pwrCtrlCtx.fillStyle = "#fff";
-                    pwrCtrlCtx.fillText("...", xCenter, ch - 60);
-                }
+                tpcCtx.fillText(`RF ${rf}`, x + (mapX(10)-mapX(0))/2, ch - 20);
             }
         }
     }
     
-    pwrCtrlTimeOffset += 0.2;
-    if (pwrCtrlTimeOffset > 60) {
-        // Pause briefly at the end, then restart sweep
-        if (pwrCtrlTimeOffset > 75) pwrCtrlTimeOffset = 0;
+    // Draw threshold line
+    let thresholdY = mapY(parseFloat(paSwitchSlider.value));
+    tpcCtx.moveTo(40, thresholdY); tpcCtx.lineTo(cw-20, thresholdY);
+    
+    // Draw horizontal grids
+    for(let y=Math.floor(minP/10)*10; y<=Math.ceil(maxP/10)*10; y+=10) {
+        let yPos = mapY(y);
+        tpcCtx.moveTo(40, yPos); tpcCtx.lineTo(cw-20, yPos);
+        tpcCtx.fillStyle = "rgba(148, 163, 184, 0.8)";
+        tpcCtx.textAlign = "right";
+        tpcCtx.fillText(`${y}`, 35, yPos + 4);
+    }
+    tpcCtx.stroke();
+    
+    tpcCtx.textAlign = "left";
+    tpcCtx.fillText("dBm", 10, 15);
+    
+    // Draw Ideal Target Staircase (Faint)
+    if (!tpcChartData || tpcChartData.length === 0) return;
+    
+    tpcCtx.beginPath();
+    tpcCtx.strokeStyle = "rgba(148, 163, 184, 0.3)";
+    tpcCtx.lineWidth = 2;
+    tpcCtx.setLineDash([4, 4]);
+    
+    for(let i=0; i<totalSteps; i++) {
+        let d = tpcChartData[i];
+        let xStart = mapX(i);
+        let xEnd = mapX(i+1);
+        let y = mapY(d.ideal);
+        
+        if (i===0) tpcCtx.moveTo(xStart, y);
+        else {
+            tpcCtx.lineTo(xStart, y); // Vertical rise
+        }
+        tpcCtx.lineTo(xEnd, y); // Horizontal flat
+    }
+    tpcCtx.stroke();
+    tpcCtx.setLineDash([]);
+}
+
+function animateTpcStep() {
+    let totalSteps = tpcChartData ? tpcChartData.length : 50;
+    if (!tpcIsAnimating || tpcCurrentStep >= totalSteps) {
+        tpcIsAnimating = false;
+        tpcStartBtn.textContent = "▶ Start Animation";
+        return;
     }
     
-    pwrCtrlAnimationId = requestAnimationFrame(() => drawPowerControl(duplex, dir, pattern));
+    const cw = tpcPwrCanvas.width;
+    const ch = tpcPwrCanvas.height;
+    
+    let {minP, maxP} = getTpcYScale();
+    function mapY(val) { return ch - 40 - ((val - minP) / (maxP - minP)) * (ch - 80); }
+    function mapX(sf) { return 40 + (sf / totalSteps) * (cw - 60); }
+    
+    let sf = tpcCurrentStep;
+    let d = tpcChartData[sf];
+    
+    let xStart = mapX(sf);
+    let xEnd = mapX(sf+1);
+    
+    // 1. Draw dynamic tolerance box
+    if (sf > 0) {
+        let yIdeal = mapY(d.ideal);
+        let tolPx = (d.tol / (maxP - minP)) * (ch - 80);
+        
+        tpcCtx.fillStyle = d.fail ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)";
+        tpcCtx.fillRect(xStart, yIdeal - tolPx, xEnd - xStart, tolPx * 2);
+        
+        tpcCtx.strokeStyle = d.fail ? "rgba(239, 68, 68, 0.5)" : "rgba(16, 185, 129, 0.5)";
+        tpcCtx.lineWidth = 1;
+        tpcCtx.beginPath();
+        tpcCtx.moveTo(xStart, yIdeal - tolPx); tpcCtx.lineTo(xEnd, yIdeal - tolPx);
+        tpcCtx.moveTo(xStart, yIdeal + tolPx); tpcCtx.lineTo(xEnd, yIdeal + tolPx);
+        tpcCtx.stroke();
+    }
+    
+    // 2. Draw Actual Power staircase segment
+    tpcCtx.beginPath();
+    tpcCtx.strokeStyle = d.fail ? "#ef4444" : "#60a5fa";
+    tpcCtx.lineWidth = 3;
+    
+    let yActual = mapY(d.actual);
+    
+    if (sf === 0) {
+        tpcCtx.moveTo(xStart, yActual);
+        tpcCtx.lineTo(xEnd, yActual);
+        tpcCtx.stroke();
+    } else {
+        let prevY = mapY(tpcChartData[sf-1].actual);
+        
+        tpcCtx.moveTo(xStart, prevY);
+        
+        if (d.isSwitch) {
+            // Glitch simulation
+            let skew = parseFloat(timingSkewSlider.value); // 0 to 5 us
+            // Note: slot is narrower visually now (1/50 of width). 
+            let skewWidthPx = (skew / 5.0) * ((xEnd - xStart) * 0.8); // allow wider glitch up to 80% of step
+            let gainErr = parseFloat(gainErrorSlider.value);
+            
+            // Peak Y mapping
+            let peakY = mapY(tpcChartData[sf-1].actual + d.idealDelta + (gainErr * 1.5));
+            
+            if (skewWidthPx > 0) {
+                tpcCtx.lineTo(xStart + skewWidthPx/2, peakY);
+                tpcCtx.lineTo(xStart + skewWidthPx, yActual);
+            } else {
+                tpcCtx.lineTo(xStart, yActual);
+            }
+            
+            tpcCtx.lineTo(xEnd, yActual); 
+            tpcCtx.stroke();
+            
+            // Glitch Marker
+            tpcCtx.fillStyle = "#f59e0b";
+            tpcCtx.beginPath();
+            tpcCtx.arc(xStart + skewWidthPx/2, peakY, 3, 0, Math.PI*2);
+            tpcCtx.fill();
+        } else {
+            tpcCtx.lineTo(xStart, yActual);
+            tpcCtx.lineTo(xEnd, yActual);
+            tpcCtx.stroke();
+        }
+    }
+    
+    // Append Log
+    tpcLog.innerHTML += `<div style="margin-bottom: 8px;">${d.msg}</div>`;
+    tpcLog.scrollTop = tpcLog.scrollHeight;
+    
+    tpcCurrentStep++;
+    
+    let speed = tpcChartData.length === 10 ? 300 : 50;
+    setTimeout(animateTpcStep, speed);
 }
 
-function updatePowerControl() {
-    if (!pwrCtrlDuplex || !pwrCtrlDir || !pwrCtrlPattern) return;
-    const duplex = pwrCtrlDuplex.value;
-    const dir = pwrCtrlDir.value;
-    const pattern = pwrCtrlPattern.value;
+function startTpcAnimation() {
+    if (tpcIsAnimating) return;
+    updateSliders();
     
-    if (pwrCtrlAnimationId) cancelAnimationFrame(pwrCtrlAnimationId);
+    tpcChartData = generateTpcSequence();
+    tpcCurrentStep = 0;
+    tpcLog.innerHTML = "";
     
-    pwrCtrlTimeOffset = 0; // restart sweep
-    drawPowerControl(duplex, dir, pattern);
+    if (tpcCtx) {
+        const cw = tpcPwrCanvas.width;
+        const ch = tpcPwrCanvas.height;
+        drawTpcBackground(cw, ch);
+    }
+    
+    tpcIsAnimating = true;
+    tpcStartBtn.textContent = "⏳ Animating...";
+    animateTpcStep();
 }
 
-if (pwrCtrlDuplex) {
-    pwrCtrlDuplex.addEventListener('change', updatePowerControl);
-    pwrCtrlDir.addEventListener('change', updatePowerControl);
-    pwrCtrlPattern.addEventListener('change', updatePowerControl);
+function resetTpc() {
+    tpcIsAnimating = false;
+    tpcStartBtn.textContent = "▶ Start Animation";
+    tpcCurrentStep = 0;
+    tpcLog.innerHTML = `<div style="color: rgba(255,255,255,0.3); text-align: center; margin-top: 150px;">Waiting to start...</div>`;
+    
+    tpcChartData = generateTpcSequence();
+    
+    if (tpcCtx) {
+        tpcCtx.clearRect(0, 0, tpcPwrCanvas.width, tpcPwrCanvas.height);
+        drawTpcBackground(tpcPwrCanvas.width, tpcPwrCanvas.height);
+    }
+}
+
+function onTpcInputChange() {
+    updateSliders();
+    if (!tpcIsAnimating) {
+        resetTpc();
+    }
+}
+
+if (tpcPatternType) {
+    tpcPatternType.addEventListener('change', onTpcInputChange);
+    paSwitchSlider.addEventListener('input', onTpcInputChange);
+    gainErrorSlider.addEventListener('input', onTpcInputChange);
+    timingSkewSlider.addEventListener('input', onTpcInputChange);
+    tpcTransType.addEventListener('change', onTpcInputChange);
+    
+    tpcStartBtn.addEventListener('click', startTpcAnimation);
+    tpcResetBtn.addEventListener('click', resetTpc);
     
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             const targetId = item.getAttribute('data-target');
             if(targetId === 'power-ctrl') {
-                setTimeout(updatePowerControl, 10);
+                setTimeout(() => {
+                    if (!tpcIsAnimating && tpcCurrentStep === 0) onTpcInputChange();
+                }, 50);
             }
         });
     });
     
-    setTimeout(updatePowerControl, 100);
+    setTimeout(onTpcInputChange, 100);
 }
 
 // ============================================
@@ -1613,4 +1805,327 @@ if (maxInputSlider) {
     });
     
     setTimeout(updateMaxInput, 100);
+}
+
+// ============================================
+// Adjacent Channel Selectivity Module (7.5)
+// ============================================
+
+const acsFreqRange = document.getElementById('acs-freq-range');
+const acsChannelBw = document.getElementById('acs-channel-bw');
+const acsRefsensSlider = document.getElementById('acs-refsens-slider');
+const acsRefsensVal = document.getElementById('acs-refsens-val');
+const acsP1dbSlider = document.getElementById('acs-p1db-slider');
+const acsP1dbVal = document.getElementById('acs-p1db-val');
+const acsRejectionSlider = document.getElementById('acs-rejection-slider');
+const acsRejectionVal = document.getElementById('acs-rejection-val');
+
+const acsCalcWanted = document.getElementById('acs-calc-wanted');
+const acsCalcInterferer = document.getElementById('acs-calc-interferer');
+const acsCalcTarget = document.getElementById('acs-calc-target');
+
+const acsLnaStatus = document.getElementById('acs-lna-status');
+const acsResidualVal = document.getElementById('acs-residual-val');
+const acsTputVal = document.getElementById('acs-tput-val');
+const acsPassFail = document.getElementById('acs-pass-fail');
+const acsCanvas = document.getElementById('acs-canvas');
+
+function calculate3gppAcs(range, bw, refsens) {
+    let wanted = refsens + 14;
+    let target = 0;
+    let interferer = 0;
+    let offset = 0;
+    
+    // For both Low Band and High Band we use the exact same formulas 
+    // unless specified otherwise.
+    if (bw === 3) {
+        target = 33;
+        interferer = refsens + 45.5;
+        offset = 3;
+    } else if (bw === 5 || bw === 10) {
+        target = 33;
+        interferer = refsens + 45.5;
+        offset = bw / 2 + 2.5;
+    } else if (bw === 15) {
+        target = 30;
+        interferer = refsens + 42.5;
+        offset = bw / 2 + 2.5;
+    } else {
+        target = Math.ceil((27 - 10 * Math.log10(bw / 20)) * 2) / 2;
+        interferer = refsens + Math.ceil((39.5 - 10 * Math.log10(bw / 20)) * 2) / 2;
+        offset = bw / 2 + 2.5;
+    }
+    
+    return { wanted, target, interferer, offset };
+}
+
+let acsCtx = null;
+if (acsCanvas) {
+    acsCtx = acsCanvas.getContext('2d');
+}
+
+let acsAnimId = null;
+let acsPhase = 0; // for animated components if any
+
+function drawAcsSpectrum(wantedPwr, interfererPwr, rejection, lnaNoiseFloor, residualInterferer, bw, offset) {
+    if (!acsCtx) return;
+    const cw = acsCanvas.width;
+    const ch = acsCanvas.height;
+    
+    // Clear
+    acsCtx.fillStyle = "rgba(15, 23, 42, 1)";
+    acsCtx.fillRect(0, 0, cw, ch);
+    
+    // Y-axis: -120 dBm to 0 dBm
+    const minY = -120;
+    const maxY = 0;
+    function mapY(dbm) {
+        let val = Math.max(minY, Math.min(maxY, dbm));
+        return ch - 30 - ((val - minY) / (maxY - minY)) * (ch - 60);
+    }
+    
+    // X-axis: dynamically scale based on BW and offset
+    // Want to show slightly to the left of the wanted signal, up to slightly past the interferer
+    const minX = -bw;
+    const maxX = offset + bw; 
+    function mapX(mhz) {
+        return 40 + ((mhz - minX) / (maxX - minX)) * (cw - 60);
+    }
+    
+    // Grid
+    acsCtx.strokeStyle = "rgba(148, 163, 184, 0.15)";
+    acsCtx.lineWidth = 1;
+    acsCtx.beginPath();
+    
+    // Determine a reasonable grid step based on max frequency
+    let xStep = maxX > 50 ? 20 : (maxX > 20 ? 10 : 5);
+    
+    for (let x = 0; x <= maxX; x += xStep) {
+        let px = mapX(x);
+        acsCtx.moveTo(px, 30); acsCtx.lineTo(px, ch - 30);
+        acsCtx.fillStyle = "rgba(148, 163, 184, 0.8)";
+        acsCtx.font = "11px sans-serif";
+        acsCtx.textAlign = "center";
+        acsCtx.fillText(x === 0 ? "0 (Wanted)" : `+${x} MHz`, px, ch - 10);
+    }
+    for (let y = -120; y <= 0; y += 20) {
+        let py = mapY(y);
+        acsCtx.moveTo(40, py); acsCtx.lineTo(cw - 20, py);
+        acsCtx.textAlign = "right";
+        acsCtx.fillText(`${y}`, 35, py + 4);
+    }
+    acsCtx.stroke();
+    
+    // Noise Floor
+    let floorY = mapY(lnaNoiseFloor);
+    acsCtx.fillStyle = lnaNoiseFloor > -100 ? "rgba(239, 68, 68, 0.2)" : "rgba(148, 163, 184, 0.1)";
+    acsCtx.fillRect(40, floorY, cw - 60, ch - 30 - floorY);
+    
+    if (lnaNoiseFloor > -100) {
+        acsCtx.fillStyle = "rgba(239, 68, 68, 0.8)";
+        acsCtx.textAlign = "right";
+        acsCtx.fillText("Noise Floor Rise", cw - 30, floorY - 5);
+    }
+    
+    // TRx Filter Profile (Dotted Line)
+    let filterEdge = bw / 2;
+    acsCtx.beginPath();
+    acsCtx.strokeStyle = "rgba(168, 85, 247, 0.8)";
+    acsCtx.lineWidth = 2;
+    acsCtx.setLineDash([5, 5]);
+    acsCtx.moveTo(mapX(minX), mapY(0));
+    acsCtx.lineTo(mapX(filterEdge), mapY(0));
+    acsCtx.lineTo(mapX(filterEdge + 1), mapY(-rejection)); // steep rolloff
+    acsCtx.lineTo(mapX(maxX), mapY(-rejection));
+    acsCtx.stroke();
+    acsCtx.setLineDash([]);
+    
+    // Signal widths: slightly smaller than BW to leave a visual gap
+    let wWidth = bw * 0.95 / 2;
+    let iWidth = bw * 0.95 / 2;
+    
+    // Wanted Signal Area (Green)
+    acsCtx.fillStyle = "rgba(16, 185, 129, 0.6)";
+    acsCtx.strokeStyle = "#10b981";
+    acsCtx.beginPath();
+    acsCtx.moveTo(mapX(-wWidth), mapY(minY));
+    acsCtx.lineTo(mapX(-wWidth), mapY(wantedPwr));
+    acsCtx.lineTo(mapX(wWidth), mapY(wantedPwr));
+    acsCtx.lineTo(mapX(wWidth), mapY(minY));
+    acsCtx.fill();
+    acsCtx.stroke();
+    
+    // Residual Interferer Area (Orange)
+    acsCtx.fillStyle = "rgba(249, 115, 22, 0.6)";
+    acsCtx.strokeStyle = "#f97316";
+    acsCtx.beginPath();
+    acsCtx.moveTo(mapX(offset - iWidth), mapY(minY));
+    acsCtx.lineTo(mapX(offset - iWidth), mapY(residualInterferer));
+    acsCtx.lineTo(mapX(offset + iWidth), mapY(residualInterferer));
+    acsCtx.lineTo(mapX(offset + iWidth), mapY(minY));
+    acsCtx.fill();
+    acsCtx.stroke();
+    
+    // Pre-Filter Raw Interferer (faint outline)
+    acsCtx.beginPath();
+    acsCtx.strokeStyle = "rgba(249, 115, 22, 0.2)";
+    acsCtx.setLineDash([2, 2]);
+    acsCtx.moveTo(mapX(offset - iWidth), mapY(minY));
+    acsCtx.lineTo(mapX(offset - iWidth), mapY(interfererPwr));
+    acsCtx.lineTo(mapX(offset + iWidth), mapY(interfererPwr));
+    acsCtx.lineTo(mapX(offset + iWidth), mapY(minY));
+    acsCtx.stroke();
+    acsCtx.setLineDash([]);
+    
+    // Animation for RF energy
+    acsPhase += 0.5;
+    let modW = (acsPhase % (wWidth * 2)) - wWidth;
+    acsCtx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    acsCtx.beginPath();
+    acsCtx.moveTo(mapX(modW), mapY(minY));
+    acsCtx.lineTo(mapX(modW), mapY(wantedPwr));
+    acsCtx.stroke();
+    
+    let modI = (acsPhase % (iWidth * 2)) - iWidth;
+    acsCtx.beginPath();
+    acsCtx.moveTo(mapX(offset + modI), mapY(minY));
+    acsCtx.lineTo(mapX(offset + modI), mapY(residualInterferer));
+    acsCtx.stroke();
+    
+    // Label
+    acsCtx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    acsCtx.textAlign = "left";
+    acsCtx.fillText("TRx Baseband Selectivity Filter", mapX(filterEdge + 2), mapY(-rejection) - 10);
+    
+    acsAnimId = requestAnimationFrame(() => drawAcsSpectrum(wantedPwr, interfererPwr, rejection, lnaNoiseFloor, residualInterferer, bw, offset));
+}
+
+function updateAcs() {
+    if (!acsFreqRange) return;
+    
+    const range = acsFreqRange.value;
+    let bw = parseFloat(acsChannelBw.value);
+    
+    // Enforce high band rules (>10 MHz)
+    if (range === 'high' && bw < 10) {
+        bw = 10;
+        acsChannelBw.value = "10";
+    }
+    
+    // Hide/Disable bw options < 10 for High Band
+    Array.from(acsChannelBw.options).forEach(opt => {
+        if (parseFloat(opt.value) < 10) {
+            opt.disabled = (range === 'high');
+            if (range === 'high') opt.style.display = 'none';
+            else opt.style.display = '';
+        }
+    });
+    
+    const refsens = parseFloat(acsRefsensSlider.value);
+    const p1db = parseFloat(acsP1dbSlider.value);
+    const rejection = parseFloat(acsRejectionSlider.value);
+    
+    const { wanted: wantedPwr, target: acsTarget, interferer: interfererPwr, offset: offset } = calculate3gppAcs(range, bw, refsens);
+    
+    // UI Update
+    acsRefsensVal.textContent = `${refsens.toFixed(1)} dBm`;
+    acsP1dbVal.textContent = `${p1db} dBm`;
+    acsRejectionVal.textContent = `${rejection} dB`;
+    
+    acsCalcWanted.textContent = `${wantedPwr.toFixed(1)} dBm`;
+    acsCalcInterferer.textContent = `${interfererPwr.toFixed(1)} dBm`;
+    acsCalcTarget.textContent = `+${offset} MHz / ${acsTarget} dB`;
+    
+    // Math Logic
+    let totalPwr = interfererPwr; // Dominated by interferer
+    let isSaturated = totalPwr > p1db;
+    
+    let lnaNoiseFloor = -100;
+    let lnaStatusText = "正常";
+    let lnaStatusColor = "var(--text-secondary)"; 
+    
+    if (isSaturated) {
+        let compression = totalPwr - p1db;
+        lnaNoiseFloor = -100 + (compression * 2.5); 
+        lnaStatusText = "飽和壓迫中";
+        lnaStatusColor = "#ef4444"; 
+    }
+    
+    acsLnaStatus.textContent = lnaStatusText;
+    acsLnaStatus.style.color = lnaStatusColor;
+    
+    let residualInterferer = interfererPwr - rejection;
+    acsResidualVal.textContent = `${residualInterferer.toFixed(1)} dBm`;
+    
+    // Summing interference powers in linear domain
+    let noiseMw = Math.pow(10, lnaNoiseFloor / 10);
+    let resMw = Math.pow(10, residualInterferer / 10);
+    let effectiveInterference = 10 * Math.log10(noiseMw + resMw);
+    let basebandSnr = wantedPwr - effectiveInterference;
+    
+    let tput = 100.0;
+    if (basebandSnr >= 2.0) {
+        tput = 100.0;
+    } else if (basebandSnr >= -1.0) {
+        // interpolate smoothly between 95% and 100%
+        tput = 95.0 + ((basebandSnr + 1.0) / 3.0) * 5.0;
+    } else if (basebandSnr > -3.0) {
+        // interpolate steeply between 0% and 95%
+        tput = ((basebandSnr + 3.0) / 2.0) * 95.0;
+    } else {
+        tput = 0.0;
+    }
+    
+    if (tput < 0) tput = 0;
+    if (tput > 100) tput = 100.0;
+    
+    let failReason = "";
+    if (tput < 95.0) {
+        if (residualInterferer > lnaNoiseFloor + 3) {
+            failReason = "內部 Filter 抑制力不足導致干擾";
+        } else if (lnaNoiseFloor > residualInterferer + 3) {
+            failReason = "LNA 飽和導致感度劣化";
+        } else {
+            failReason = "LNA 飽和與 Filter 抑制雙重失效";
+        }
+    }
+    
+    // Update Throughput UI
+    acsTputVal.textContent = `${tput.toFixed(1)}%`;
+    if (tput >= 95.0) {
+        acsTputVal.style.color = "#10b981";
+        acsPassFail.textContent = "[PASS] 符合 3GPP ACS 規範";
+        acsPassFail.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+        acsPassFail.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        acsPassFail.style.color = "#10b981";
+    } else {
+        acsTputVal.style.color = "#ef4444";
+        acsPassFail.innerHTML = `[FAIL] <span style="font-size: 1rem; margin-left: 10px;">${failReason}</span>`;
+        acsPassFail.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+        acsPassFail.style.borderColor = "rgba(239, 68, 68, 0.3)";
+        acsPassFail.style.color = "#ef4444";
+    }
+    
+    if (acsAnimId) cancelAnimationFrame(acsAnimId);
+    drawAcsSpectrum(wantedPwr, interfererPwr, rejection, lnaNoiseFloor, residualInterferer, bw, offset);
+}
+
+if (acsFreqRange) {
+    acsFreqRange.addEventListener('change', updateAcs);
+    acsChannelBw.addEventListener('change', updateAcs);
+    acsRefsensSlider.addEventListener('input', updateAcs);
+    acsP1dbSlider.addEventListener('input', updateAcs);
+    acsRejectionSlider.addEventListener('input', updateAcs);
+    
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const targetId = item.getAttribute('data-target');
+            if(targetId === 'acs') {
+                setTimeout(updateAcs, 10);
+            }
+        });
+    });
+    
+    setTimeout(updateAcs, 100);
 }

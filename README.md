@@ -22,6 +22,7 @@ Built for RF & hardware engineers who want to understand not just what the spec 
 | 6.5.2.4 | ACLR | PA P1dB effect on spectral regrowth, Pass/Fail verdict |
 | 7.3 | Reference Sensitivity | 2×2 / 4×4 MIMO sensitivity estimation by band & SCS |
 | 7.4 | Maximum Input Level | LNA saturation effect on constellation & throughput |
+| 7.5 | Adjacent Channel Selectivity | Baseband filter rejection vs LNA compression effects |
 
 ---
 
