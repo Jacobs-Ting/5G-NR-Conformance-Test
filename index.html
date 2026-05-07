@@ -32,6 +32,7 @@
                     <a href="#" class="nav-item" data-target="sem">6.5.2.2 Spectrum Emission Mask</a>
                     <a href="#" class="nav-item" data-target="aclr">6.5.2.4 Adjacent Channel Leakage Ratio(ACLR)</a>
                     <a href="#" class="nav-item" data-target="refsens">7.3 Reference Sensitivity</a>
+                    <a href="#" class="nav-item" data-target="cadc-desense">7.3A.0.4 CA/DC Interference</a>
                     <a href="#" class="nav-item" data-target="max-input">7.4 Maximum Input Level</a>
                     <a href="#" class="nav-item" data-target="acs">7.5 Adjacent Channel Selectivity</a>
                 </nav>
@@ -661,14 +662,14 @@
                                 <!-- Column 1 -->
                                 <div style="display: flex; flex-direction: column; gap: 1rem; flex: 1; min-width: 300px;">
                                     <div class="select-group">
-                                        <label for="acs-freq-range">操作頻段範圍 (Frequency Range)</label>
+                                        <label for="acs-freq-range">Frequency Range</label>
                                         <select id="acs-freq-range" class="glass-select">
                                             <option value="low">Low Band (< 2700 MHz)</option>
                                             <option value="high">High Band (>= 3300 MHz)</option>
                                         </select>
                                     </div>
                                     <div class="select-group">
-                                        <label for="acs-channel-bw">通道頻寬 (Channel BW) (MHz)</label>
+                                        <label for="acs-channel-bw">Channel BW (MHz)</label>
                                         <select id="acs-channel-bw" class="glass-select">
                                             <option value="3">3</option>
                                             <option value="5">5</option>
@@ -686,7 +687,7 @@
                                     </div>
                                     <div class="select-group">
                                         <label for="acs-refsens-slider" style="display: flex; justify-content: space-between; align-items: baseline;">
-                                            <span>參考感度 (REFSENS) (dBm)</span>
+                                            <span>REFSENS (dBm)</span>
                                             <span id="acs-refsens-val" style="color: #60a5fa; font-size: 1.1rem; font-weight: 700;">-95 dBm</span>
                                         </label>
                                         <input type="range" id="acs-refsens-slider" min="-110" max="-80" step="0.5" value="-95" class="glass-slider">
@@ -696,14 +697,14 @@
                                 <div style="display: flex; flex-direction: column; gap: 1rem; flex: 1; min-width: 300px;">
                                     <div class="select-group">
                                         <label for="acs-p1db-slider" style="display: flex; justify-content: space-between; align-items: baseline;">
-                                            <span>LNA 輸入飽和點 (LNA Input P1dB) (dBm)</span>
+                                            <span>LNA Input P1dB (dBm)</span>
                                             <span id="acs-p1db-val" style="color: #ef4444; font-size: 1.1rem; font-weight: 700;">-15 dBm</span>
                                         </label>
                                         <input type="range" id="acs-p1db-slider" min="-30" max="0" step="1" value="-15" class="glass-slider">
                                     </div>
                                     <div class="select-group">
                                         <label for="acs-rejection-slider" style="display: flex; justify-content: space-between; align-items: baseline;">
-                                            <span>TRx 內部通道濾波抑制 (Internal Select Filter Rejection) (dB)</span>
+                                            <span>Internal Select Filter Rejection (dB)</span>
                                             <span id="acs-rejection-val" style="color: #a855f7; font-size: 1.1rem; font-weight: 700;">40 dB</span>
                                         </label>
                                         <input type="range" id="acs-rejection-slider" min="10" max="60" step="1" value="40" class="glass-slider">
@@ -732,11 +733,11 @@
                                         </div>
                                         
                                         <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem;">
-                                            <span style="color: var(--text-secondary);">LNA 狀態:</span>
-                                            <span id="acs-lna-status" style="font-weight: 700; font-size: 1.1rem;">正常</span>
+                                            <span style="color: var(--text-secondary);">LNA Status:</span>
+                                            <span id="acs-lna-status" style="font-weight: 700; font-size: 1.1rem;">Normal</span>
                                         </div>
                                         <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-                                            <span style="color: var(--text-secondary);">基頻干擾殘留:</span>
+                                            <span style="color: var(--text-secondary);">Residual BB Interferer:</span>
                                             <span id="acs-residual-val" style="font-weight: 700; font-size: 1.1rem;">-85 dBm</span>
                                         </div>
                                         <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
@@ -746,7 +747,7 @@
                                     </div>
                                     
                                     <div id="acs-pass-fail" class="evm-status-banner" style="margin-top: 1rem;">
-                                        [PASS] 符合 3GPP ACS 規範
+                                        [PASS] 3GPP ACS Compliant
                                     </div>
                                 </div>
                                 
@@ -754,6 +755,86 @@
                                     <h3 style="align-self: flex-start;">Baseband Spectrum Analyzer View</h3>
                                     <div class="canvas-wrapper" style="border-radius: 16px; padding: 1rem; background: rgba(15, 23, 42, 0.8); display: inline-block; width: 100%;">
                                         <canvas id="acs-canvas" width="600" height="300" style="border-radius: 8px; width: 100%;"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- 7.3A.0.4 CA/DC Interference Tab Content -->
+                <div id="cadc-desense" class="tab-content hidden">
+                    <div class="workspace-container cadc-container">
+                        <section class="mpr-card glass-panel" aria-labelledby="cadc-heading">
+                            <h2 id="cadc-heading">7.3A.0.4 & 7.3A.0.5 CA/DC Self-Desense & Interference Analyzer</h2>
+                            <p class="subtitle">Harmonic and Intermodulation Distortion (IMD) Collision Detection</p>
+                            
+                            <div class="mpr-form" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; align-items: flex-start; margin-bottom: 2rem;">
+                                <!-- Column 1 -->
+                                <div style="display: flex; flex-direction: column; gap: 1rem; flex: 1; min-width: 300px;">
+                                    <h3 style="color: var(--text-secondary);">載波聚合/雙連結設定 (CA/DC Configuration)</h3>
+                                    <div class="select-group">
+                                        <label for="cadc-band1">Band 1</label>
+                                        <select id="cadc-band1" class="glass-select">
+                                            <!-- Dynamically populated -->
+                                        </select>
+                                    </div>
+                                    <div class="select-group">
+                                        <label for="cadc-tx1">Tx 1 Frequency (MHz)</label>
+                                        <input type="number" id="cadc-tx1" class="glass-input" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); color: white;" step="0.1">
+                                        <div id="cadc-tx1-range" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;"></div>
+                                        <div id="cadc-tx1-error" style="font-size: 0.8rem; color: #ef4444; margin-top: 0.25rem; display: none;">[Error] Tx1 out of allowed UL range.</div>
+                                    </div>
+                                </div>
+                                <!-- Column 2 -->
+                                <div style="display: flex; flex-direction: column; gap: 1rem; flex: 1; min-width: 300px;">
+                                    <h3 style="visibility: hidden;">Spacer</h3>
+                                    <div class="select-group">
+                                        <label for="cadc-band2">Band 2</label>
+                                        <select id="cadc-band2" class="glass-select">
+                                            <!-- Dynamically populated -->
+                                        </select>
+                                    </div>
+                                    <div class="select-group">
+                                        <label for="cadc-tx2">Tx 2 Frequency (MHz)</label>
+                                        <input type="number" id="cadc-tx2" class="glass-input" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); color: white;" step="0.1">
+                                        <div id="cadc-tx2-range" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;"></div>
+                                        <div id="cadc-tx2-error" style="font-size: 0.8rem; color: #ef4444; margin-top: 0.25rem; display: none;">[Error] Tx2 out of allowed UL range.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Analysis Mode Options -->
+                            <div class="mpr-form" style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="cadc-chk-harmonic" checked style="width: 1.2rem; height: 1.2rem; accent-color: #3b82f6; cursor: pointer;">
+                                    <label for="cadc-chk-harmonic" style="font-weight: 600; cursor: pointer;">諧波分析 (Harmonics)</label>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="cadc-chk-imd" checked style="width: 1.2rem; height: 1.2rem; accent-color: #3b82f6; cursor: pointer;">
+                                    <label for="cadc-chk-imd" style="font-weight: 600; cursor: pointer;">互調失真分析 (Intermodulation)</label>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <section class="evm-result-card glass-panel" style="margin-top: 2rem;">
+                            <div class="evm-layout">
+                                <div class="evm-info" style="min-width: 320px; flex: 1;">
+                                    <h3>Results Log</h3>
+                                    
+                                    <div id="cadc-status-banner" class="evm-status-banner" style="margin-bottom: 1rem;">
+                                        安全 (Safe)
+                                    </div>
+                                    
+                                    <div id="cadc-log-container" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 1rem; max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); line-height: 1.5;">
+                                        <!-- Logs will be inserted here -->
+                                    </div>
+                                </div>
+                                
+                                <div class="evm-constellation" style="flex: 2; min-width: 400px; display: flex; flex-direction: column; align-items: center;">
+                                    <h3 style="align-self: flex-start;">Dynamic Spectrum Chart</h3>
+                                    <div class="canvas-wrapper" style="border-radius: 16px; padding: 1rem; background: rgba(15, 23, 42, 0.8); display: inline-block; width: 100%;">
+                                        <canvas id="cadc-canvas" width="600" height="300" style="border-radius: 8px; width: 100%;"></canvas>
                                     </div>
                                 </div>
                             </div>

@@ -2041,13 +2041,13 @@ function updateAcs() {
     let isSaturated = totalPwr > p1db;
     
     let lnaNoiseFloor = -100;
-    let lnaStatusText = "正常";
+    let lnaStatusText = "Normal";
     let lnaStatusColor = "var(--text-secondary)"; 
     
     if (isSaturated) {
         let compression = totalPwr - p1db;
         lnaNoiseFloor = -100 + (compression * 2.5); 
-        lnaStatusText = "飽和壓迫中";
+        lnaStatusText = "Saturated";
         lnaStatusColor = "#ef4444"; 
     }
     
@@ -2082,11 +2082,11 @@ function updateAcs() {
     let failReason = "";
     if (tput < 95.0) {
         if (residualInterferer > lnaNoiseFloor + 3) {
-            failReason = "內部 Filter 抑制力不足導致干擾";
+            failReason = "Insufficient Internal Filter Rejection";
         } else if (lnaNoiseFloor > residualInterferer + 3) {
-            failReason = "LNA 飽和導致感度劣化";
+            failReason = "LNA Saturation degrading sensitivity";
         } else {
-            failReason = "LNA 飽和與 Filter 抑制雙重失效";
+            failReason = "Dual Failure: LNA Saturation & Filter Rejection";
         }
     }
     
@@ -2094,7 +2094,7 @@ function updateAcs() {
     acsTputVal.textContent = `${tput.toFixed(1)}%`;
     if (tput >= 95.0) {
         acsTputVal.style.color = "#10b981";
-        acsPassFail.textContent = "[PASS] 符合 3GPP ACS 規範";
+        acsPassFail.textContent = "[PASS] 3GPP ACS Compliant";
         acsPassFail.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
         acsPassFail.style.borderColor = "rgba(16, 185, 129, 0.3)";
         acsPassFail.style.color = "#10b981";
@@ -2128,4 +2128,443 @@ if (acsFreqRange) {
     });
     
     setTimeout(updateAcs, 100);
+}
+
+// ============================================================================
+// 7.3A.0.4 CA/DC Interference Module
+// ============================================================================
+
+let cadcBandData = [];
+let cadcBandSelect1 = document.getElementById('cadc-band1');
+let cadcBandSelect2 = document.getElementById('cadc-band2');
+let cadcTx1Input = document.getElementById('cadc-tx1');
+let cadcTx2Input = document.getElementById('cadc-tx2');
+let cadcTx1Range = document.getElementById('cadc-tx1-range');
+let cadcTx2Range = document.getElementById('cadc-tx2-range');
+let cadcTx1Error = document.getElementById('cadc-tx1-error');
+let cadcTx2Error = document.getElementById('cadc-tx2-error');
+let cadcChkHarmonic = document.getElementById('cadc-chk-harmonic');
+let cadcChkImd = document.getElementById('cadc-chk-imd');
+let cadcStatusBanner = document.getElementById('cadc-status-banner');
+let cadcLogContainer = document.getElementById('cadc-log-container');
+let cadcCanvas = document.getElementById('cadc-canvas');
+let cadcCtx = cadcCanvas ? cadcCanvas.getContext('2d') : null;
+
+const rawCsvData = `Band,Duplex_Mode,UL_Min,UL_Max,DL_Min,DL_Max
+n1,FDD,1920.0,1980.0,2110.0,2170.0
+n2,FDD,1850.0,1910.0,1930.0,1990.0
+n3,FDD,1710.0,1785.0,1805.0,1880.0
+n5,FDD,824.0,849.0,869.0,894.0
+n7,FDD,2500.0,2570.0,2620.0,2690.0
+n8,FDD,880.0,915.0,925.0,960.0
+n12,FDD,699.0,716.0,729.0,746.0
+n13,FDD,777.0,787.0,746.0,756.0
+n14,FDD,788.0,798.0,758.0,768.0
+n20,FDD,832.0,862.0,791.0,821.0
+n24,FDD,1626.5,1660.5,1525.0,1559.0
+n25,FDD,1850.0,1915.0,1930.0,1995.0
+n26,FDD,814.0,849.0,859.0,894.0
+n28,FDD,703.0,748.0,758.0,803.0
+n29,SDL,,,717.0,728.0
+n30,FDD,2305.0,2315.0,2350.0,2360.0
+n31,FDD,452.5,457.5,462.5,467.5
+n34,TDD,2010.0,2025.0,2010.0,2025.0
+n38,TDD,2570.0,2620.0,2570.0,2620.0
+n39,TDD,1880.0,1920.0,1880.0,1920.0
+n40,TDD,2300.0,2400.0,2300.0,2400.0
+n41,TDD,2496.0,2690.0,2496.0,2690.0
+n46,TDD,5150.0,5925.0,5150.0,5925.0
+n47,TDD,5855.0,5925.0,5855.0,5925.0
+n48,TDD,3550.0,3700.0,3550.0,3700.0
+n50,TDD,1432.0,1517.0,1432.0,1517.0
+n51,TDD,1427.0,1432.0,1427.0,1432.0
+n53,TDD,2483.5,2495.0,2483.5,2495.0
+n54,TDD,1670.0,1675.0,1670.0,1675.0
+n65,FDD,1920.0,2010.0,2110.0,2200.0
+n66,FDD,1710.0,1780.0,2110.0,2200.0
+n70,FDD,1695.0,1710.0,1995.0,2020.0
+n71,FDD,663.0,698.0,617.0,652.0
+n72,FDD,451.0,456.0,461.0,466.0
+n74,FDD,1427.0,1470.0,1475.0,1518.0
+n75,SDL,,,1432.0,1517.0
+n76,SDL,,,1427.0,1432.0
+n77,TDD,3300.0,4200.0,3300.0,4200.0
+n78,TDD,3300.0,3800.0,3300.0,3800.0
+n79,TDD,4400.0,5000.0,4400.0,5000.0
+n80,SUL,1710.0,1785.0,,
+n81,SUL,880.0,915.0,,
+n82,SUL,832.0,862.0,,
+n83,SUL,703.0,748.0,,
+n84,SUL,1920.0,1980.0,,
+n85,FDD,698.0,716.0,728.0,746.0
+n86,SUL,1710.0,1780.0,,
+n91,FDD,832.0,862.0,1427.0,1432.0
+n92,FDD,832.0,862.0,1432.0,1517.0
+n93,FDD,880.0,915.0,1427.0,1432.0
+n94,FDD,880.0,915.0,1432.0,1517.0
+n95,SUL,2010.0,2025.0,,
+n96,TDD,5925.0,7125.0,5925.0,7125.0
+n97,SUL,2300.0,2400.0,,
+n98,SUL,1880.0,1920.0,,
+n99,SUL,1626.5,1660.5,,
+n100,FDD,874.4,880.0,919.4,925.0
+n101,TDD,1900.0,1910.0,1900.0,1910.0
+n104,TDD,6425.0,7125.0,6425.0,7125.0
+n105,FDD,663.0,703.0,612.0,652.0
+n106,FDD,896.0,901.0,935.0,940.0
+n109,FDD,703.0,733.0,1432.0,1517.0`;
+
+// Load CSV
+function loadCadcData() {
+    const lines = rawCsvData.trim().split('\n');
+    const headers = lines[0].split(',');
+    
+    for(let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        if(cols.length < 6) continue;
+        
+        const band = cols[0].trim();
+        const duplexStr = cols[1].trim();
+        const dlMinStr = cols[4].trim();
+        const dlMaxStr = cols[5].trim();
+        const ulMinStr = cols[2].trim();
+        const ulMaxStr = cols[3].trim();
+        
+        if(!dlMinStr || !dlMaxStr) continue; // Skip SUL or bands with no DL
+        if(!ulMinStr || !ulMaxStr) continue; // Skip SDL or bands with no UL
+        
+        cadcBandData.push({
+            band: band,
+            duplex: duplexStr,
+            ulMin: parseFloat(ulMinStr),
+            ulMax: parseFloat(ulMaxStr),
+            dlMin: parseFloat(dlMinStr),
+            dlMax: parseFloat(dlMaxStr)
+        });
+    }
+    populateCadcDropdowns();
+}
+
+function populateCadcDropdowns() {
+    if(!cadcBandSelect1) return;
+    
+    cadcBandSelect1.innerHTML = '';
+    cadcBandSelect2.innerHTML = '';
+    
+    cadcBandData.forEach(b => {
+        let opt1 = document.createElement('option');
+        opt1.value = b.band;
+        opt1.textContent = b.band;
+        cadcBandSelect1.appendChild(opt1);
+        
+        let opt2 = document.createElement('option');
+        opt2.value = b.band;
+        opt2.textContent = b.band;
+        cadcBandSelect2.appendChild(opt2);
+    });
+    
+    // Default to n1 and n3
+    cadcBandSelect1.value = 'n1';
+    cadcBandSelect2.value = 'n3';
+    
+    onCadcBandChange(1);
+    onCadcBandChange(2);
+    
+    // Default frequencies
+    cadcTx1Input.value = cadcBandData.find(b => b.band === 'n1').ulMin + 10;
+    cadcTx2Input.value = cadcBandData.find(b => b.band === 'n3').ulMin + 10;
+    
+    updateCadcAnalysis();
+}
+
+function onCadcBandChange(idx) {
+    let sel = idx === 1 ? cadcBandSelect1 : cadcBandSelect2;
+    let rangeTxt = idx === 1 ? cadcTx1Range : cadcTx2Range;
+    let bData = cadcBandData.find(b => b.band === sel.value);
+    
+    if(bData) {
+        rangeTxt.textContent = `Allowed UL: ${bData.ulMin} - ${bData.ulMax} MHz | DL: ${bData.dlMin} - ${bData.dlMax} MHz`;
+    }
+    updateCadcAnalysis();
+}
+
+function validateTx(freq, bandInfo) {
+    if(!freq || isNaN(freq)) return false;
+    if(!bandInfo) return false;
+    return (freq >= bandInfo.ulMin && freq <= bandInfo.ulMax);
+}
+
+function updateCadcAnalysis() {
+    if(!cadcBandData.length) return;
+    
+    let b1Name = cadcBandSelect1.value;
+    let b2Name = cadcBandSelect2.value;
+    let b1 = cadcBandData.find(b => b.band === b1Name);
+    let b2 = cadcBandData.find(b => b.band === b2Name);
+    
+    let f1 = parseFloat(cadcTx1Input.value);
+    let f2 = parseFloat(cadcTx2Input.value);
+    
+    let valid1 = validateTx(f1, b1);
+    let valid2 = validateTx(f2, b2);
+    
+    cadcTx1Error.style.display = valid1 ? 'none' : 'block';
+    cadcTx2Error.style.display = valid2 ? 'none' : 'block';
+    
+    if(!valid1 || !valid2) {
+        cadcStatusBanner.textContent = "[ERROR] 請修正紅色錯誤以進行計算";
+        cadcStatusBanner.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+        cadcStatusBanner.style.borderColor = "rgba(239, 68, 68, 0.3)";
+        cadcStatusBanner.style.color = "#ef4444";
+        cadcLogContainer.innerHTML = "Cannot calculate due to invalid Tx frequency.";
+        drawCadcSpectrum(f1, f2, b1, b2, [], valid1, valid2);
+        return;
+    }
+    
+    let doHarmonic = cadcChkHarmonic.checked;
+    let doImd = cadcChkImd.checked;
+    
+    let isLowBand1 = b1.ulMin < 1000;
+    let isHighBand1 = b1.ulMin >= 1000;
+    let isLowBand2 = b2.ulMin < 1000;
+    let isHighBand2 = b2.ulMin >= 1000;
+    
+    let is1UL_LowHigh = (isLowBand1 && isHighBand2) || (isLowBand2 && isHighBand1);
+    
+    let activeTx1 = true;
+    let activeTx2 = true;
+    
+    if (is1UL_LowHigh) {
+        // Assume 2DL/1UL configuration by default: High-Band is Rx ONLY
+        if (isLowBand1) activeTx2 = false;
+        else activeTx1 = false;
+        
+        doImd = false; // Disable all IMD calculations for 1UL
+    }
+    
+    let ghosts = [];
+    
+    if(doHarmonic) {
+        if (activeTx1) {
+            for(let n=2; n<=6; n++) {
+                let nameStr = is1UL_LowHigh && n >= 4 ? `${n}H Harmonic Hit` : `H${n} of Tx1`;
+                ghosts.push({ freq: n*f1, name: nameStr, type: 'Harmonic' });
+            }
+        }
+        if (activeTx2) {
+            for(let n=2; n<=6; n++) {
+                let nameStr = is1UL_LowHigh && n >= 4 ? `${n}H Harmonic Hit` : `H${n} of Tx2`;
+                ghosts.push({ freq: n*f2, name: nameStr, type: 'Harmonic' });
+            }
+        }
+    }
+    
+    if(doImd) {
+        // IMD2
+        ghosts.push({ freq: f1+f2, name: 'IMD2 (f1+f2)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(f1-f2), name: 'IMD2 (|f1-f2|)', type: 'IMD' });
+        
+        // IMD3
+        ghosts.push({ freq: 2*f1+f2, name: 'IMD3 (2f1+f2)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(2*f1-f2), name: 'IMD3 (|2f1-f2|)', type: 'IMD' });
+        ghosts.push({ freq: 2*f2+f1, name: 'IMD3 (2f2+f1)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(2*f2-f1), name: 'IMD3 (|2f2-f1|)', type: 'IMD' });
+        
+        // IMD4
+        ghosts.push({ freq: 2*f1+2*f2, name: 'IMD4 (2f1+2f2)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(2*f1-2*f2), name: 'IMD4 (|2f1-2f2|)', type: 'IMD' });
+        ghosts.push({ freq: 3*f1+f2, name: 'IMD4 (3f1+f2)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(3*f1-f2), name: 'IMD4 (|3f1-f2|)', type: 'IMD' });
+        ghosts.push({ freq: 3*f2+f1, name: 'IMD4 (3f2+f1)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(3*f2-f1), name: 'IMD4 (|3f2-f1|)', type: 'IMD' });
+        
+        // IMD5
+        ghosts.push({ freq: 3*f1+2*f2, name: 'IMD5 (3f1+2f2)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(3*f1-2*f2), name: 'IMD5 (|3f1-2f2|)', type: 'IMD' });
+        ghosts.push({ freq: 3*f2+2*f1, name: 'IMD5 (3f2+2f1)', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(3*f2-2*f1), name: 'IMD5 (|3f2-2f1|)', type: 'IMD' });
+        
+        // Cross-Band IMD logic
+        let f_low = Math.min(f1, f2);
+        let f_high = Math.max(f1, f2);
+        
+        ghosts.push({ freq: Math.abs(f_high - 2 * f_low), name: '跨頻段 IMD3 (|f_high - 2*f_low|', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(f_high - 4 * f_low), name: '跨頻段 IMD5 (|f_high - 4*f_low|', type: 'IMD' });
+        ghosts.push({ freq: Math.abs(f_high - 6 * f_low), name: '跨頻段 IMD7 (|f_high - 6*f_low|', type: 'IMD' });
+    }
+    
+    // Hit Detection
+    let hasSevere = false;
+    let logHTML = "";
+    
+    // Sort ghosts by frequency for cleaner log
+    ghosts.sort((a,b) => a.freq - b.freq);
+    
+    ghosts.forEach(g => {
+        let rx1Active = (b1.duplex === 'FDD');
+        let rx2Active = (b2.duplex === 'FDD');
+        
+        let physicallyInB1 = (g.freq >= b1.dlMin && g.freq <= b1.dlMax);
+        let physicallyInB2 = (g.freq >= b2.dlMin && g.freq <= b2.dlMax);
+        
+        let hitB1 = rx1Active && physicallyInB1;
+        let hitB2 = rx2Active && physicallyInB2;
+        
+        if(hitB1 || hitB2) {
+            hasSevere = true;
+            g.isHit = true;
+            let victim = hitB1 ? b1Name : b2Name;
+            if (g.name.includes('跨頻段')) {
+                logHTML += `<span style="color:#ef4444;">[FAIL] 嚴重干擾！檢測到${g.name} = ${g.freq.toFixed(1)} MHz) 正中落入 ${victim} Rx 接收帶。</span><br>`;
+            } else {
+                logHTML += `<span style="color:#ef4444;">[FAIL] ${g.name} (${g.freq.toFixed(1)} MHz) 落入 ${victim} Rx 接收帶</span><br>`;
+            }
+        } else if ((physicallyInB1 && !rx1Active) || (physicallyInB2 && !rx2Active)) {
+            g.isHit = false;
+            let victim = physicallyInB1 ? b1Name : b2Name;
+            logHTML += `<span style="color:#10b981;">[SAFE] ${g.name} (${g.freq.toFixed(1)} MHz) 落入 ${victim}，但因 TDD 模式發射時 Rx 關閉而豁免 (Safe: Receiver Off during Tx Slot)。</span><br>`;
+        } else {
+            g.isHit = false;
+        }
+    });
+    
+    if(!hasSevere) {
+        logHTML = `<span style="color:#10b981;">[PASS] No generated harmonics or IMD products hit the DL Rx bands.</span><br>` + logHTML;
+        cadcStatusBanner.textContent = "安全 (Safe)";
+        cadcStatusBanner.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+        cadcStatusBanner.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        cadcStatusBanner.style.color = "#10b981";
+    } else {
+        cadcStatusBanner.textContent = "嚴重干擾 (Severe Interference)";
+        cadcStatusBanner.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+        cadcStatusBanner.style.borderColor = "rgba(239, 68, 68, 0.3)";
+        cadcStatusBanner.style.color = "#ef4444";
+    }
+    
+    cadcLogContainer.innerHTML = logHTML;
+    
+    drawCadcSpectrum(f1, f2, b1, b2, ghosts, activeTx1 ? valid1 : false, activeTx2 ? valid2 : false);
+}
+
+function drawCadcSpectrum(f1, f2, b1, b2, ghosts, valid1, valid2) {
+    if(!cadcCtx) return;
+    
+    const cw = cadcCanvas.width;
+    const ch = cadcCanvas.height;
+    
+    cadcCtx.clearRect(0, 0, cw, ch);
+    
+    // Find min and max frequencies to scale X-axis
+    let f_low = Math.min(f1, f2);
+    let f_high = Math.max(f1, f2);
+    let rxMin = Math.min(b1.dlMin, b2.dlMin);
+    let rxMax = Math.max(b1.dlMax, b2.dlMax);
+    
+    let minF = Math.min(f_low - 100, rxMin);
+    let maxF = Math.max(f_high + 100, rxMax);
+    
+    if(minF < 0) minF = 0;
+    
+    function mapX(f) {
+        return 40 + ((f - minF) / (maxF - minF)) * (cw - 80);
+    }
+    
+    // Draw grid
+    cadcCtx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    cadcCtx.lineWidth = 1;
+    cadcCtx.beginPath();
+    for (let x = minF - (minF%500); x <= maxF; x += 500) {
+        let px = mapX(x);
+        cadcCtx.moveTo(px, 20);
+        cadcCtx.lineTo(px, ch - 30);
+        cadcCtx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        cadcCtx.font = "10px sans-serif";
+        cadcCtx.fillText(x, px - 10, ch - 15);
+    }
+    cadcCtx.stroke();
+    
+    // Draw Rx Bands
+    cadcCtx.fillStyle = "rgba(16, 185, 129, 0.15)";
+    let xB1Min = mapX(b1.dlMin);
+    let xB1Max = mapX(b1.dlMax);
+    cadcCtx.fillRect(xB1Min, 20, Math.max(2, xB1Max - xB1Min), ch - 50);
+    cadcCtx.fillStyle = "rgba(16, 185, 129, 0.8)";
+    cadcCtx.fillText(`${b1.band} Rx`, xB1Min + 5, 35);
+    
+    cadcCtx.fillStyle = "rgba(59, 130, 246, 0.15)";
+    let xB2Min = mapX(b2.dlMin);
+    let xB2Max = mapX(b2.dlMax);
+    cadcCtx.fillRect(xB2Min, 20, Math.max(2, xB2Max - xB2Min), ch - 50);
+    cadcCtx.fillStyle = "rgba(59, 130, 246, 0.8)";
+    cadcCtx.fillText(`${b2.band} Rx`, xB2Min + 5, 55);
+    
+    // Draw Tx
+    cadcCtx.lineWidth = 3;
+    if(valid1) {
+        cadcCtx.strokeStyle = "#38bdf8";
+        cadcCtx.beginPath();
+        cadcCtx.moveTo(mapX(f1), ch - 30);
+        cadcCtx.lineTo(mapX(f1), 60);
+        cadcCtx.stroke();
+        cadcCtx.fillStyle = "#38bdf8";
+        cadcCtx.fillText(`Tx1`, mapX(f1) - 10, 55);
+    }
+    
+    if(valid2) {
+        cadcCtx.strokeStyle = "#818cf8";
+        cadcCtx.beginPath();
+        cadcCtx.moveTo(mapX(f2), ch - 30);
+        cadcCtx.lineTo(mapX(f2), 60);
+        cadcCtx.stroke();
+        cadcCtx.fillStyle = "#818cf8";
+        cadcCtx.fillText(`Tx2`, mapX(f2) - 10, 55);
+    }
+    
+    // Draw Ghosts
+    ghosts.forEach(g => {
+        let x = mapX(g.freq);
+        if(x >= 40 && x <= cw - 40) {
+            cadcCtx.beginPath();
+            if(g.isHit) {
+                cadcCtx.strokeStyle = "#ef4444";
+                cadcCtx.lineWidth = 3;
+                cadcCtx.setLineDash([]);
+                cadcCtx.moveTo(x, ch - 30);
+                cadcCtx.lineTo(x, 100);
+                cadcCtx.stroke();
+                cadcCtx.fillStyle = "#ef4444";
+                cadcCtx.fillText(`HIT`, x - 10, 95);
+            } else {
+                cadcCtx.strokeStyle = "rgba(245, 158, 11, 0.5)";
+                cadcCtx.lineWidth = 1;
+                cadcCtx.setLineDash([4, 2]);
+                cadcCtx.moveTo(x, ch - 30);
+                cadcCtx.lineTo(x, 150);
+                cadcCtx.stroke();
+            }
+        }
+    });
+    cadcCtx.setLineDash([]);
+}
+
+if (cadcBandSelect1) {
+    cadcBandSelect1.addEventListener('change', () => { onCadcBandChange(1); });
+    cadcBandSelect2.addEventListener('change', () => { onCadcBandChange(2); });
+    cadcTx1Input.addEventListener('input', updateCadcAnalysis);
+    cadcTx2Input.addEventListener('input', updateCadcAnalysis);
+    cadcChkHarmonic.addEventListener('change', updateCadcAnalysis);
+    cadcChkImd.addEventListener('change', updateCadcAnalysis);
+    
+    // Event listener for tab navigation to initialize only once when visible
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const targetId = item.getAttribute('data-target');
+            if(targetId === 'cadc-desense' && cadcBandData.length === 0) {
+                loadCadcData();
+            } else if (targetId === 'cadc-desense') {
+                updateCadcAnalysis();
+            }
+        });
+    });
 }
