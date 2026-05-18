@@ -1,40 +1,95 @@
 // Data for Table 6.2.1-1: UE Power Class
-// Including standard n1 supporting Class 3=24dBm and Class 2=26dBm as requested by user
-const bandSupportData = {
-    "n1": [
-        { class_level: 3, power: "24 dBm" },
-        { class_level: 2, power: "26 dBm" }
-    ],
-    "n2": [ { class_level: 3, power: "24 dBm" } ],
-    "n3": [ { class_level: 3, power: "24 dBm" } ],
-    "n5": [ { class_level: 3, power: "24 dBm" } ],
-    "n7": [ { class_level: 3, power: "24 dBm" } ],
-    "n8": [ { class_level: 3, power: "24 dBm" } ],
-    "n20": [ { class_level: 3, power: "24 dBm" } ],
-    "n28": [ { class_level: 3, power: "24 dBm" } ],
-    "n38": [ { class_level: 3, power: "24 dBm" } ],
-    "n40": [ { class_level: 3, power: "24 dBm" } ],
-    "n41": [
-        { class_level: 3, power: "24 dBm" },
-        { class_level: 2, power: "26 dBm" }
-    ],
-    "n66": [ { class_level: 3, power: "24 dBm" } ],
-    "n71": [ { class_level: 3, power: "24 dBm" } ],
-    "n77": [
-        { class_level: 3, power: "24 dBm" },
-        { class_level: 2, power: "26 dBm" }
-    ],
-    "n78": [
-        { class_level: 3, power: "24 dBm" },
-        { class_level: 2, power: "26 dBm" }
-    ],
-    "n79": [
-        { class_level: 3, power: "24 dBm" },
-        { class_level: 2, power: "26 dBm" }
-    ],
-    "n257": [ { class_level: 1, power: "31 dBm" }, { class_level: 3, power: "24 dBm" } ],
-    "n258": [ { class_level: 1, power: "31 dBm" }, { class_level: 3, power: "24 dBm" } ]
-};
+let bandSupportData = {};
+
+const csvText = `
+﻿NR band,Class 1 (dBm),Tolerance (dB),Class 1.5 (dBm),Tolerance (dB),Class 2 (dBm),Tolerance (dB),Class 3 (dBm),Tolerance (dB)
+n1,,,,,26,+2/-3,23,±2
+n2,,,,,26,+2/-3,23,±2
+n3,,,,,26,+2/-3,23,±2
+n5,,,,,,,23,±2
+n7,31,+2/-3,,,26,+2/-3,23,±2
+n8,,,,,26,+2/-3,23,±2
+n12,,,,,,,23,±2
+n13,,,,,26,+2/-3,23,±2
+n14,31,+2/-3,,,26,+2/-3,23,±2
+n18,,,,,,,23,±2
+n20,,,,,,,23,±2
+n24,,,,,,,23,+2/-3
+n25,31,+2/-3,,,26,+2/-3,23,±2
+n26,,,,,,,23,±2
+n28,,,,,,,23,+2/-2.5
+n30,,,,,,,23,±2
+n31,31,+2/-3,,,,,23,±2
+n34,,,29,+2/-3,26,+2/-3,23,±2
+n38,,,,,,,23,±2
+n39,,,29,+2/-3,26,+2/-3,23,±2
+n40,31,+2/-3,29,+2/-3,26,+2/-3,23,±2
+n41,31,+2/-3,29,+2/-3,26,+2/-3,23,±2
+n47,,,,,,,23,±2
+n48,,,,,,,23,+2/-3
+n50,,,,,,,23,±2
+n51,,,,,,,23,±2
+n53,,,,,,,23,±2
+n54,,,,,,,23,±2
+n65,,,,,,,23,±2
+n66,31,+2/-3,,,26,+2/-3,23,±2
+n70,,,,,26,+2/-3,23,±2
+n71,31,+2/-3,,,26,+2/-3,23,+2/-2.5
+n72,31,+2/-3,,,,,23,±2
+n74,,,,,,,23,±2
+n77,31,+2/-3,29,+2/-3,26,+2/-3,23,+2/-3
+n78,31,+2/-3,29,+2/-3,26,+2/-3,23,+2/-3
+n79,,,29,+2/-3,26,+2/-3,23,+2/-3
+n80,,,,,26,+2/-3,23,±2
+n81,,,,,,,23,±2
+n82,,,,,,,23,±2
+n83,,,,,,,23,+2/-2.5
+n84,,,,,26,+2/-3,23,±2
+n85,31,+2/-3,,,26,+2/-3,23,±2
+n86,,,,,,,23,±2
+n89,,,,,,,23,±2
+n91,,,,,,,23,±2
+n92,,,,,,,23,±2
+n93,,,,,,,23,±2
+n94,,,,,,,23,±2
+n95,,,,,26,+2/-3,23,±2
+n97,,,,,26,+2/-3,23,±2
+n98,,,,,26,+2/-3,23,±2
+n99,,,,,,,23,+2/-3
+n100,31,+2/-3,,,,,23,±2
+n101,31,+2/-3,,,,,23,±2
+n104,,,,,26,+2/-3,23,+2/-3
+n105,,,,,,,23,+2/-2.5
+n106,,,,,,,23,±2
+n109,,,,,,,23,±2
+`;
+
+        const lines = csvText.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const values = lines[i].split(',');
+            const band = values[0].trim();
+            const bandData = [];
+            
+            // CSV columns:
+            // 0: NR band, 1: Class 1, 2: Tol, 3: Class 1.5, 4: Tol, 5: Class 2, 6: Tol, 7: Class 3, 8: Tol
+            if (values[1] && values[1].trim()) {
+                bandData.push({ class_level: 1, power: values[1].trim() + " dBm", tol: values[2] ? values[2].trim() : "" });
+            }
+            if (values[3] && values[3].trim()) {
+                bandData.push({ class_level: 1.5, power: values[3].trim() + " dBm", tol: values[4] ? values[4].trim() : "" });
+            }
+            if (values[5] && values[5].trim()) {
+                bandData.push({ class_level: 2, power: values[5].trim() + " dBm", tol: values[6] ? values[6].trim() : "" });
+            }
+            if (values[7] && values[7].trim()) {
+                bandData.push({ class_level: 3, power: values[7].trim() + " dBm", tol: values[8] ? values[8].trim() : "" });
+            }
+            
+            if (bandData.length > 0) {
+                bandSupportData[band] = bandData;
+            }
+        }
 
 // MPR Rules mapping from Table 6.2.2-1 (Class 3) and 6.2.2-2 (Class 2)
 const mprRules = {
@@ -125,18 +180,22 @@ function handleSearch(isUpdate = false) {
         
         data.forEach(item => {
             const classCard = document.createElement('div');
-            classCard.className = `class-item pc${item.class_level}`;
+            const cssClass = item.class_level === 1.5 ? 'pc1' : `pc${item.class_level}`;
+            classCard.className = `class-item ${cssClass}`;
             const powerVal = item.power.split(' ')[0];
-            const powerUnit = item.power.split(' ')[1];
+            const powerUnit = item.power.split(' ')[1] || 'dBm';
             
             const mprHtml = (item.class_level === 2 || item.class_level === 3) 
                 ? `<div class="mpr-data">MPR: <strong>${getMprValue(item.class_level)} dB</strong></div>` 
                 : `<div class="mpr-data">MPR: <strong>N/A</strong></div>`;
             
+            let tolHtml = item.tol ? `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -0.5rem; margin-bottom: 0.5rem;">Tolerance: ${item.tol}</div>` : '';
+            
             classCard.innerHTML = `
                 <div class="class-name">Class ${item.class_level}</div>
                 <div class="power-value">${powerVal}</div>
                 <div class="power-unit">${powerUnit}</div>
+                ${tolHtml}
                 ${mprHtml}
             `;
             
@@ -151,17 +210,14 @@ function handleSearch(isUpdate = false) {
         }
         
     } else {
-        // Default behavior for other valid 5G bands not explicitly in the dictionary
+        // SDL Band behavior
         if (bandName.match(/^n[1-9][0-9]{0,2}$/)) {
-            resultBandName.textContent = `Band ${bandName.toUpperCase()} (Default)`;
-            const defaultMprHtml = `<div class="mpr-data">MPR: <strong>${getMprValue(3)} dB</strong></div>`;
+            resultBandName.textContent = `Band ${bandName.toUpperCase()} (SDL)`;
             
             classesContainer.innerHTML = `
-                <div class="class-item pc3">
-                    <div class="class-name">Class 3</div>
-                    <div class="power-value">24</div>
-                    <div class="power-unit">dBm</div>
-                    ${defaultMprHtml}
+                <div class="class-item pc1" style="grid-column: 1 / -1; padding: 2rem;">
+                    <div class="class-name">SDL頻段</div>
+                    <div class="power-value" style="font-size: 1.5rem; margin-top: 1rem; color: var(--text-secondary);">無Tx power Spec</div>
                 </div>
             `;
             if (!isUpdate) {
@@ -2095,7 +2151,26 @@ function updateAcs() {
     const p1db = parseFloat(acsP1dbSlider.value);
     const rejection = parseFloat(acsRejectionSlider.value);
     
-    const { wanted: wantedPwr, target: acsTarget, interferer: interfererPwr, offset: offset } = calculate3gppAcs(range, bw, refsens);
+    let lnaGain = 15;
+    const lnaGainSlider = document.getElementById('acs-lna-gain-slider');
+    const lnaGainVal = document.getElementById('acs-lna-gain-val');
+    if (lnaGainSlider && lnaGainVal) {
+        lnaGain = parseFloat(lnaGainSlider.value);
+        lnaGainVal.textContent = `${lnaGain} dB`;
+    }
+    
+    let inputInterferer = -49.5;
+    const interfererSlider = document.getElementById('acs-interferer-slider');
+    const interfererVal = document.getElementById('acs-interferer-val');
+    if (interfererSlider && interfererVal) {
+        inputInterferer = parseFloat(interfererSlider.value);
+        interfererVal.textContent = `${inputInterferer.toFixed(1)} dBm`;
+    }
+    
+    const { wanted: inputWanted, target: acsTarget, interferer: standardInterferer, offset: offset } = calculate3gppAcs(range, bw, refsens);
+    
+    let wantedPwr = inputWanted + lnaGain;
+    let interfererPwr = inputInterferer + lnaGain;
     
     // UI Update
     acsRefsensVal.textContent = `${refsens.toFixed(1)} dBm`;
@@ -2107,16 +2182,15 @@ function updateAcs() {
     acsCalcTarget.textContent = `+${offset} MHz / ${acsTarget} dB`;
     
     // Math Logic
-    let totalPwr = interfererPwr; // Dominated by interferer
-    let isSaturated = totalPwr > p1db;
+    let isSaturated = inputInterferer > p1db;
     
-    let lnaNoiseFloor = -100;
+    let lnaNoiseFloor = -100 + lnaGain;
     let lnaStatusText = "Normal";
     let lnaStatusColor = "var(--text-secondary)"; 
     
     if (isSaturated) {
-        let compression = totalPwr - p1db;
-        lnaNoiseFloor = -100 + (compression * 2.5); 
+        let compression = inputInterferer - p1db;
+        lnaNoiseFloor = (-100 + lnaGain) + (compression * 2.5); 
         lnaStatusText = "Saturated";
         lnaStatusColor = "#ef4444"; 
     }
@@ -2134,16 +2208,20 @@ function updateAcs() {
     let basebandSnr = wantedPwr - effectiveInterference;
     
     let tput = 100.0;
-    if (basebandSnr >= 2.0) {
-        tput = 100.0;
-    } else if (basebandSnr >= -1.0) {
-        // interpolate smoothly between 95% and 100%
-        tput = 95.0 + ((basebandSnr + 1.0) / 3.0) * 5.0;
-    } else if (basebandSnr > -3.0) {
-        // interpolate steeply between 0% and 95%
-        tput = ((basebandSnr + 3.0) / 2.0) * 95.0;
-    } else {
+    if (isSaturated) {
         tput = 0.0;
+    } else {
+        if (basebandSnr >= 2.0) {
+            tput = 100.0;
+        } else if (basebandSnr >= -1.0) {
+            // interpolate smoothly between 95% and 100%
+            tput = 95.0 + ((basebandSnr + 1.0) / 3.0) * 5.0;
+        } else if (basebandSnr > -3.0) {
+            // interpolate steeply between 0% and 95%
+            tput = ((basebandSnr + 3.0) / 2.0) * 95.0;
+        } else {
+            tput = 0.0;
+        }
     }
     
     if (tput < 0) tput = 0;
@@ -2151,7 +2229,9 @@ function updateAcs() {
     
     let failReason = "";
     if (tput < 95.0) {
-        if (residualInterferer > lnaNoiseFloor + 3) {
+        if (isSaturated) {
+            failReason = "LNA Saturation (Input power > P1dB)";
+        } else if (residualInterferer > lnaNoiseFloor + 3) {
             failReason = "Insufficient Internal Filter Rejection";
         } else if (lnaNoiseFloor > residualInterferer + 3) {
             failReason = "LNA Saturation degrading sensitivity";
@@ -2186,6 +2266,16 @@ if (acsFreqRange) {
     acsRefsensSlider.addEventListener('input', updateAcs);
     acsP1dbSlider.addEventListener('input', updateAcs);
     acsRejectionSlider.addEventListener('input', updateAcs);
+    
+    const lnaGainSlider = document.getElementById('acs-lna-gain-slider');
+    if (lnaGainSlider) {
+        lnaGainSlider.addEventListener('input', updateAcs);
+    }
+    
+    const interfererSlider = document.getElementById('acs-interferer-slider');
+    if (interfererSlider) {
+        interfererSlider.addEventListener('input', updateAcs);
+    }
     
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
