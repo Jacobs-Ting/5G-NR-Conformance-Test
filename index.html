@@ -158,6 +158,14 @@
                                         <option value="256 QAM">256 QAM</option>
                                     </select>
                                 </div>
+                                <div class="select-group" style="width: 180px;">
+                                    <label for="evm-tx-power">Tx Output Power (dBm)</label>
+                                    <input type="number" id="evm-tx-power" class="glass-select" value="23" step="0.5" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                                <div class="select-group" style="width: 180px;">
+                                    <label for="evm-pa-p1d">PA P1D (dBm)</label>
+                                    <input type="number" id="evm-pa-p1d" class="glass-select" value="26" step="0.5" style="width: 100%; box-sizing: border-box;">
+                                </div>
                                 <div class="select-group" style="min-width: 250px; flex-grow: 1; max-width: 400px;">
                                     <label for="snr-slider" style="display: flex; justify-content: space-between; align-items: baseline;">
                                         <span>Channel SNR</span>
@@ -204,7 +212,8 @@
                                     <div style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
                                         <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
                                             * <strong>SNR (Signal-to-Noise Ratio)</strong>: Higher values indicate less noise and interference, leading to tighter constellation clusters.<br>
-                                            * <strong>EVM (Error Vector Magnitude)</strong>: The regulatory limit is the maximum allowable error margin for the corresponding modulation.
+                                            * <strong>EVM (Error Vector Magnitude)</strong>: The regulatory limit is the maximum allowable error margin for the corresponding modulation.<br>
+                                            * <strong>PA Non-linearity</strong>: When Tx Output Power exceeds the PA's P1dB compression point, the PA enters the non-linear region. This causes signal distortion (AM-AM & AM-PM) and significantly deteriorates the EVM.
                                         </p>
                                     </div>
                                 </div>
@@ -388,6 +397,14 @@
                                         <option value="100">100 MHz</option>
                                     </select>
                                 </div>
+                                <div class="select-group" style="width: 180px;">
+                                    <label for="sem-tx-power">Tx Output Power (dBm)</label>
+                                    <input type="number" id="sem-tx-power" class="glass-select" value="23" step="0.5" style="width: 100%; box-sizing: border-box;">
+                                </div>
+                                <div class="select-group" style="width: 180px;">
+                                    <label for="sem-pa-p1d">PA P1D (dBm)</label>
+                                    <input type="number" id="sem-pa-p1d" class="glass-select" value="26" step="0.5" style="width: 100%; box-sizing: border-box;">
+                                </div>
                             </div>
                         </section>
 
@@ -410,9 +427,14 @@
                                         </table>
                                     </div>
                                     
+                                    <div id="sem-pass-fail" class="evm-status-banner" style="margin-top: 1rem; text-align: center; padding: 0.75rem; border-radius: 8px; font-weight: bold; font-size: 1rem; transition: all 0.3s; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981;">
+                                        ✅ SEM Pass
+                                    </div>
+                                    
                                     <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px;">
                                         <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
-                                            * <strong>SEM (Spectrum Emission Mask)</strong>: Defines the maximum allowed absolute emission boundary (in dBm) outside the primary channel. The red staircase boundary indicates the regulatory compliance limit.
+                                            * <strong>SEM (Spectrum Emission Mask)</strong>: Defines the maximum allowed absolute emission boundary (in dBm) outside the primary channel. The red staircase boundary indicates the regulatory compliance limit.<br>
+                                            * <strong>PA Non-linearity</strong>: When Tx Output Power exceeds the PA's P1dB compression point, spectral regrowth occurs. The out-of-band emissions will spread and violate the SEM limits, resulting in a FAIL.
                                         </p>
                                     </div>
                                 </div>

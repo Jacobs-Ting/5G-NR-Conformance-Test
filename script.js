@@ -358,13 +358,27 @@ function updateEVM() {
     const evmSimValue = document.getElementById('evm-sim-value');
     const evmPassFail = document.getElementById('evm-pass-fail');
     
+    const txPowerInput = document.getElementById('evm-tx-power');
+    const paP1dInput = document.getElementById('evm-pa-p1d');
+    
     const snrDb = parseFloat(snrSlider.value);
     snrDisplayVal.textContent = snrDb.toFixed(1) + ' dB';
     
     // EVM_rms ≈ 1 / sqrt(10^(SNR/10))
     const snrLinear = Math.pow(10, snrDb / 10);
-    const simEvmLinear = 1 / Math.sqrt(snrLinear);
-    const simEvmPercent = simEvmLinear * 100;
+    let simEvmLinear = 1 / Math.sqrt(snrLinear);
+    let simEvmPercent = simEvmLinear * 100;
+    
+    // PA Compression Effect
+    if (txPowerInput && paP1dInput) {
+        const txPower = parseFloat(txPowerInput.value);
+        const p1d = parseFloat(paP1dInput.value);
+        if (txPower > p1d) {
+            // Apply worsening effect due to PA compression
+            const compression = txPower - p1d;
+            simEvmPercent += compression * 4.5; // Exponential or large linear degradation
+        }
+    }
     
     // Update numeric limit
     evmLimitValue.textContent = limit;
@@ -408,6 +422,14 @@ if (evmModSelect) {
     const snrSlider = document.getElementById('snr-slider');
     if (snrSlider) {
         snrSlider.addEventListener('input', updateEVM);
+    }
+    const txPowerInput = document.getElementById('evm-tx-power');
+    if (txPowerInput) {
+        txPowerInput.addEventListener('input', updateEVM);
+    }
+    const paP1dInput = document.getElementById('evm-pa-p1d');
+    if (paP1dInput) {
+        paP1dInput.addEventListener('input', updateEVM);
     }
     
     // Setting a slight timeout to ensure canvas is ready
@@ -688,7 +710,7 @@ function updateSemTable(maskData) {
     });
 }
 
-function drawSEM(bw, maskData) {
+function drawSEM(bw, maskData, isFail) {
     if (!semCtx) return;
     
     const cw = semCanvas.width;
@@ -758,10 +780,21 @@ function drawSEM(bw, maskData) {
             // Leakage roll-off
             let distFromEdge = abso;
             let organicSlope = Math.max(0, 15 - distFromEdge*2); // exponential-ish roll off before hitting noise floor
+            
+            if (isFail) {
+                // Large spectral regrowth spreading out widely
+                organicSlope += 15 + Math.random()*5; 
+            }
+            
             currentPwr = Math.min(targetMask, -20 - distFromEdge*1.5) + organicSlope + (Math.random()*4 - 2);
             
-            // Re-restrict if organic slope went above mask (very unlikely with Math.min, but just in case)
-            if (currentPwr > targetMask) currentPwr = targetMask - Math.random()*2;
+            if (isFail) {
+                // Occasionally and systematically break the mask limit to show fail
+                currentPwr += 8 + Math.random()*12;
+            } else {
+                // Re-restrict if organic slope went above mask (very unlikely with Math.min, but just in case)
+                if (currentPwr > targetMask) currentPwr = targetMask - Math.random()*2;
+            }
         }
         
         semCtx.lineTo(px, mapY(currentPwr));
@@ -824,13 +857,41 @@ function drawSEM(bw, maskData) {
     semCtx.textAlign = "left";
     
     semSpectrumPhase += 0.3;
-    semAnimationId = requestAnimationFrame(() => drawSEM(bw, maskData));
+    semAnimationId = requestAnimationFrame(() => drawSEM(bw, maskData, isFail));
 }
 
 function updateSEM() {
     if (!semBwSelect) return;
     const bw = parseFloat(semBwSelect.value);
     const maskData = getSemMask(bw);
+    
+    // Check PA non-linearity
+    const txPowerInput = document.getElementById('sem-tx-power');
+    const paP1dInput = document.getElementById('sem-pa-p1d');
+    const semPassFail = document.getElementById('sem-pass-fail');
+    
+    let isFail = false;
+    if (txPowerInput && paP1dInput) {
+        const txPower = parseFloat(txPowerInput.value);
+        const p1d = parseFloat(paP1dInput.value);
+        if (txPower > p1d) {
+            isFail = true;
+        }
+    }
+    
+    if (semPassFail) {
+        if (isFail) {
+            semPassFail.textContent = '❌ SEM FAIL - Spectral Regrowth Detected';
+            semPassFail.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            semPassFail.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            semPassFail.style.color = '#ef4444';
+        } else {
+            semPassFail.textContent = '✅ SEM PASS - Within Mask Limit';
+            semPassFail.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+            semPassFail.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            semPassFail.style.color = '#10b981';
+        }
+    }
     
     updateSemTable(maskData);
     
@@ -839,11 +900,20 @@ function updateSEM() {
     if (semCtx) {
         semCtx.clearRect(0, 0, semCanvas.width, semCanvas.height);
     }
-    drawSEM(bw, maskData);
+    drawSEM(bw, maskData, isFail);
 }
 
 if (semBwSelect) {
     semBwSelect.addEventListener('change', updateSEM);
+    
+    const txPowerInput = document.getElementById('sem-tx-power');
+    if (txPowerInput) {
+        txPowerInput.addEventListener('input', updateSEM);
+    }
+    const paP1dInput = document.getElementById('sem-pa-p1d');
+    if (paP1dInput) {
+        paP1dInput.addEventListener('input', updateSEM);
+    }
     
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
